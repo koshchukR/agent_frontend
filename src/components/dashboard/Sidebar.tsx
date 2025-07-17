@@ -56,8 +56,11 @@ export const Sidebar = ({
   }];
   return <aside className={`bg-indigo-800 text-white ${isOpen ? 'w-64' : 'w-20'} transition-all duration-300 ease-in-out flex flex-col z-30`}>
       <div className="p-4 flex items-center justify-center h-16 border-b border-indigo-700">
-        {isOpen ? <div className="text-xl font-bold">TalentMatch AI</div> : <div className="w-8 h-8 rounded bg-indigo-500 flex items-center justify-center">
-            <span className="font-bold">T</span>
+        {isOpen ? <div className="flex items-center">
+            <img src="/shutterstock_2654438429.jpg" alt="Screen IQ Logo" className="h-8 w-8 mr-2" />
+            <div className="text-xl font-bold">Screen IQ</div>
+          </div> : <div className="w-8 h-8 rounded bg-indigo-500 flex items-center justify-center">
+            <span className="font-bold">S</span>
           </div>}
       </div>
       <div className="flex-1 overflow-y-auto py-4">
