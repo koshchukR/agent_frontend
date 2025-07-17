@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboardIcon, UsersIcon, BarChart2Icon, ScaleIcon, CalendarIcon, SettingsIcon, HelpCircleIcon, LogOutIcon } from 'lucide-react';
+import { LayoutDashboardIcon, UsersIcon, BarChart2Icon, ScaleIcon, CalendarIcon, SettingsIcon, HelpCircleIcon, LogOutIcon, BotIcon, MessageSquareIcon } from 'lucide-react';
 interface SidebarProps {
   isOpen: boolean;
 }
@@ -33,11 +33,22 @@ export const Sidebar = ({
     icon: <BarChart2Icon size={20} />,
     path: '/dashboard/analytics',
     active: location.pathname === '/dashboard/analytics'
+  }, {
+    label: 'AI Recruiters',
+    icon: <BotIcon size={20} />,
+    path: '/dashboard/ai-recruiters',
+    active: location.pathname === '/dashboard/ai-recruiters'
+  }, {
+    label: 'Communication',
+    icon: <MessageSquareIcon size={20} />,
+    path: '/dashboard/communication',
+    active: location.pathname === '/dashboard/communication'
   }];
   const secondaryNavItems = [{
     label: 'Settings',
     icon: <SettingsIcon size={20} />,
-    path: '#'
+    path: '/dashboard/settings',
+    active: location.pathname === '/dashboard/settings'
   }, {
     label: 'Help & Support',
     icon: <HelpCircleIcon size={20} />,
@@ -66,7 +77,7 @@ export const Sidebar = ({
             </div>
           </div>
           <nav className="mt-2 px-2 space-y-1">
-            {secondaryNavItems.map((item, index) => <Link key={index} to={item.path} className={`flex items-center px-4 py-3 text-indigo-100 hover:bg-indigo-700 rounded-md transition-colors ${!isOpen && 'justify-center'}`}>
+            {secondaryNavItems.map((item, index) => <Link key={index} to={item.path} className={`flex items-center px-4 py-3 text-indigo-100 hover:bg-indigo-700 rounded-md transition-colors ${item.active ? 'bg-indigo-900 text-white' : ''} ${!isOpen && 'justify-center'}`}>
                 {item.icon}
                 {isOpen && <span className="ml-3">{item.label}</span>}
               </Link>)}

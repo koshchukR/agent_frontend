@@ -8,6 +8,9 @@ import { CandidateDetail } from '../components/dashboard/CandidateDetail';
 import { CandidateComparison } from '../components/dashboard/CandidateComparison';
 import { ScreeningScheduler } from '../components/dashboard/ScreeningScheduler';
 import { AnalyticsDashboard } from '../components/dashboard/AnalyticsDashboard';
+import { AIRecruiters } from '../components/dashboard/AIRecruiters';
+import { SettingsPage } from '../components/dashboard/SettingsPage';
+import { CommunicationCentral } from '../components/dashboard/CommunicationCentral';
 export const Dashboard = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const navigate = useNavigate();
@@ -23,6 +26,9 @@ export const Dashboard = () => {
             <Route path="/compare" element={<CandidateComparison />} />
             <Route path="/schedule" element={<ScreeningScheduler />} />
             <Route path="/analytics" element={<AnalyticsDashboard />} />
+            <Route path="/ai-recruiters" element={<AIRecruiters />} />
+            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/communication" element={<CommunicationCentral />} />
           </Routes>
         </main>
       </div>
