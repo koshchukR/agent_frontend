@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { LayoutDashboardIcon, UsersIcon, BarChart2Icon, ScaleIcon, CalendarIcon, SettingsIcon, HelpCircleIcon, LogOutIcon, BotIcon, MessageSquareIcon } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 interface SidebarProps {
   isOpen: boolean;
 }
@@ -8,6 +9,7 @@ export const Sidebar = ({
   isOpen
 }: SidebarProps) => {
   const location = useLocation();
+  const { signOut } = useAuth();
   const navItems = [{
     label: 'Dashboard',
     icon: <LayoutDashboardIcon size={20} />,
@@ -88,7 +90,7 @@ export const Sidebar = ({
         </div>
       </div>
       <div className="p-4 border-t border-indigo-700">
-        <button className={`flex items-center text-indigo-100 hover:text-white transition-colors ${!isOpen && 'justify-center w-full'}`}>
+        <button onClick={signOut} className={`flex items-center text-indigo-100 hover:text-white transition-colors ${!isOpen && 'justify-center w-full'}`}>
           <LogOutIcon size={20} />
           {isOpen && <span className="ml-3">Log Out</span>}
         </button>

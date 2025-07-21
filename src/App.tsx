@@ -7,12 +7,29 @@ import { DashboardPreview } from './components/DashboardPreview';
 import { CTASection } from './components/CTASection';
 import { Footer } from './components/Footer';
 import { Dashboard } from './pages/Dashboard';
+import { Login } from './pages/Login';
+import { Register } from './pages/Register';
+import { AuthProvider } from './contexts/AuthContext';
+import { ProtectedRoute } from './components/ProtectedRoute';
+
 export function App() {
-  return <BrowserRouter>
-      <div className="flex flex-col min-h-screen w-full bg-white">
-        <Routes>
-          <Route path="/dashboard/*" element={<Dashboard />} />
-          <Route path="/" element={<>
+  return (
+    <BrowserRouter>
+      <AuthProvider>
+        <div className="flex flex-col min-h-screen w-full bg-white">
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route 
+              path="/dashboard/*" 
+              element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              } 
+            />
+            <Route path="/" element={
+              <>
                 <Header />
                 <main className="flex-grow">
                   <HeroSection />
@@ -21,8 +38,11 @@ export function App() {
                   <CTASection />
                 </main>
                 <Footer />
-              </>} />
-        </Routes>
-      </div>
-    </BrowserRouter>;
+              </>
+            } />
+          </Routes>
+        </div>
+      </AuthProvider>
+    </BrowserRouter>
+  );
 }
