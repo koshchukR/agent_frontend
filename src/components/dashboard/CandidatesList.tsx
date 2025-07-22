@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { apiService, type Candidate } from "../../lib/api";
 import {
   SearchIcon,
   FilterIcon,
@@ -11,17 +12,96 @@ import {
   AlertCircleIcon,
   ClockIcon,
   PhoneCall,
+  LockIcon,
 } from "lucide-react";
 export const CandidatesList = () => {
   const [sortField, setSortField] = useState("name");
   const [sortDirection, setSortDirection] = useState("asc");
   const [filterOpen, setFilterOpen] = useState(false);
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const [isCalling, setIsCalling] = useState(false);
   const [activeCallId, setActiveCallId] = useState<string | null>(null);
   const [selectedAgents, setSelectedAgents] = useState<{
     [key: string]: string;
   }>({});
+
+  // Test users that will always appear first
+  const testUsers: Candidate[] = [
+    {
+      id: "test-1",
+      name: "Roman Koshchuk",
+      position: "Senior Developer",
+      status: "Scheduled",
+      score: 92,
+      source: "LinkedIn",
+      date: "2023-06-15",
+      botRisk: "Low",
+      phone: "+380664374069",
+      email: "roman@example.com"
+    },
+    {
+      id: "test-2",
+      name: "Nicolas Thatcher",
+      position: "Electrician",
+      status: "Scheduled",
+      score: 92,
+      source: "LinkedIn",
+      date: "2023-06-15",
+      botRisk: "Low",
+      phone: "+17373288523",
+      email: "nicolas@example.com"
+    }
+  ];
+
+  // Fetch candidates from HubSpot on component mount
+  useEffect(() => {
+    const fetchCandidates = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const hubspotCandidates = await apiService.getHubSpotContacts();
+        
+        // Combine test users (first) with HubSpot candidates
+        setCandidates([...testUsers, ...hubspotCandidates]);
+      } catch (err) {
+        console.error('Error fetching candidates:', err);
+        setError(err instanceof Error ? err.message : 'Failed to fetch candidates');
+        // Fallback to test users only if API fails
+        setCandidates(testUsers);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCandidates();
+  }, []);
+
+  const refreshCandidates = () => {
+    const fetchCandidates = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const hubspotCandidates = await apiService.getHubSpotContacts();
+        
+        // Combine test users (first) with HubSpot candidates
+        setCandidates([...testUsers, ...hubspotCandidates]);
+      } catch (err) {
+        console.error('Error fetching candidates:', err);
+        setError(err instanceof Error ? err.message : 'Failed to fetch candidates');
+        // Fallback to test users only if API fails
+        setCandidates(testUsers);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCandidates();
+  };
 
   const aiRecruiters = [
     {
@@ -50,7 +130,16 @@ export const CandidatesList = () => {
     },
   ];
 
+  const isTestUser = (candidateId: string) => {
+    return candidateId.startsWith('test-');
+  };
+
   const handleAgentSelect = (candidateId: string, agentName: string) => {
+    // Only allow interaction with test users
+    if (!isTestUser(candidateId)) {
+      return;
+    }
+
     if (agentName === "AI Recruiter Screen IQ") {
       setSelectedAgents((prev) => ({ ...prev, [candidateId]: agentName }));
       const candidate = candidates.find((c) => c.id.toString() === candidateId);
@@ -109,7 +198,7 @@ export const CandidatesList = () => {
     }
   };
 
-  const handleSort = (field) => {
+  const handleSort = (field: string) => {
     if (field === sortField) {
       setSortDirection(sortDirection === "asc" ? "desc" : "asc");
     } else {
@@ -117,30 +206,26 @@ export const CandidatesList = () => {
       setSortDirection("asc");
     }
   };
-  const candidates = [
-    {
-      id: 0,
-      name: "Roman Koshchuk",
-      position: "Senior Developer",
-      status: "Scheduled",
-      score: 92,
-      source: "LinkedIn",
-      date: "2023-06-15",
-      botRisk: "Low",
-      phone: "+380664374069",
-    },
-    {
-      id: 1,
-      name: "Nicolas Thatcher",
-      position: "Electrician",
-      status: "Scheduled",
-      score: 92,
-      source: "LinkedIn",
-      date: "2023-06-15",
-      botRisk: "Low",
-      phone: "+17373288523",
-    },
-  ];
+  // Show loading state
+  if (loading) {
+    return (
+      <div>
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-gray-900">Candidates</h1>
+          <p className="text-gray-600">
+            View and manage all candidates in your pipeline.
+          </p>
+        </div>
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <div className="p-8 text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+            <p className="text-gray-500">Loading candidates from HubSpot...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
       <div className="mb-6">
@@ -148,6 +233,21 @@ export const CandidatesList = () => {
         <p className="text-gray-600">
           View and manage all candidates in your pipeline.
         </p>
+        {error && (
+          <div className="mt-2 bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded-md">
+            <div className="flex items-center justify-between">
+              <p className="text-sm">
+                <strong>Note:</strong> {error}. Showing test users and any cached data.
+              </p>
+              <button
+                onClick={refreshCandidates}
+                className="text-sm bg-yellow-600 text-white px-3 py-1 rounded hover:bg-yellow-700 transition-colors"
+              >
+                Retry
+              </button>
+            </div>
+          </div>
+        )}
       </div>
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <div className="p-6 border-b border-gray-200">
@@ -332,19 +432,30 @@ export const CandidatesList = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {candidates.map((candidate) => (
-                <tr key={candidate.id} className="hover:bg-gray-50">
+              {candidates.map((candidate) => {
+                const isLocked = !isTestUser(candidate.id);
+                return (
+                <tr 
+                  key={candidate.id} 
+                  className={`${isLocked ? 'bg-gray-50 opacity-75' : 'hover:bg-gray-50'}`}
+                >
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
-                      <div className="flex-shrink-0 h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
+                      <div className="flex-shrink-0 h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center relative">
                         {candidate.name.charAt(0)}
+                        {isLocked && (
+                          <div className="absolute -top-1 -right-1 bg-gray-600 rounded-full p-1">
+                            <LockIcon size={12} className="text-white" />
+                          </div>
+                        )}
                       </div>
                       <div className="ml-4">
-                        <div className="text-sm font-medium text-gray-900">
+                        <div className={`text-sm font-medium ${isLocked ? 'text-gray-500' : 'text-gray-900'}`}>
                           {candidate.name}
+                          {isLocked && <span className="ml-2 text-xs text-gray-400">(HubSpot)</span>}
                         </div>
                         <div className="text-xs text-gray-500">
-                          candidate{candidate.id}@example.com
+                          {candidate.email || `candidate${candidate.id}@example.com`}
                         </div>
                       </div>
                     </div>
@@ -429,59 +540,79 @@ export const CandidatesList = () => {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <Link
-                      to={`/dashboard/candidates/${candidate.id}`}
-                      className="text-indigo-600 hover:text-indigo-900 mr-3"
-                    >
-                      View
-                    </Link>
-                    <button className="text-gray-600 hover:text-gray-900">
-                      More
-                    </button>
-                  </td>
-                  <td className="py-3 px-4 border-b relative">
-                    {isCalling && activeCallId === candidate.phone ? (
-                      <div className="absolute inset-0 flex items-center justify-center bg-blue-50 border border-blue-200 rounded-md">
-                        <div className="flex items-center space-x-2">
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                          <span className="text-sm font-medium text-blue-600">
-                            Calling...
-                          </span>
-                        </div>
+                    {isLocked ? (
+                      <div className="flex items-center justify-end space-x-3">
+                        <span className="text-gray-400 cursor-not-allowed">View</span>
+                        <span className="text-gray-400 cursor-not-allowed">More</span>
+                        <LockIcon size={14} className="text-gray-400" />
                       </div>
                     ) : (
-                      <select
-                        value={selectedAgents[candidate.id] || ""}
-                        onChange={(e) =>
-                          handleAgentSelect(
-                            candidate.id.toString(),
-                            e.target.value
-                          )
-                        }
-                        className="block w-full px-3 py-2 text-sm border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-gray-400 transition-colors duration-200 bg-white"
-                      >
-                        <option value="" className="text-gray-500">
-                          Select Agent
-                        </option>
-                        {aiRecruiters.map((agent) => (
-                          <option
-                            key={agent.id}
-                            value={agent.name}
-                            disabled={!agent.enabled}
-                            className={`${
-                              !agent.enabled
-                                ? "text-gray-400 bg-gray-100"
-                                : "text-gray-900 hover:bg-indigo-50"
-                            }`}
+                      <>
+                        <Link
+                          to={`/dashboard/candidates/${candidate.id}`}
+                          className="text-indigo-600 hover:text-indigo-900 mr-3"
+                        >
+                          View
+                        </Link>
+                        <button className="text-gray-600 hover:text-gray-900">
+                          More
+                        </button>
+                      </>
+                    )}
+                  </td>
+                  <td className="py-3 px-4 border-b relative">
+                    {isLocked ? (
+                      <div className="flex items-center justify-center bg-gray-100 border border-gray-200 rounded-md px-3 py-2">
+                        <LockIcon size={16} className="text-gray-400 mr-2" />
+                        <span className="text-sm text-gray-500">Locked</span>
+                      </div>
+                    ) : (
+                      <>
+                        {isCalling && activeCallId === candidate.phone ? (
+                          <div className="absolute inset-0 flex items-center justify-center bg-blue-50 border border-blue-200 rounded-md">
+                            <div className="flex items-center space-x-2">
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                              <span className="text-sm font-medium text-blue-600">
+                                Calling...
+                              </span>
+                            </div>
+                          </div>
+                        ) : (
+                          <select
+                            value={selectedAgents[candidate.id] || ""}
+                            onChange={(e) =>
+                              handleAgentSelect(
+                                candidate.id.toString(),
+                                e.target.value
+                              )
+                            }
+                            className="block w-full px-3 py-2 text-sm border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-gray-400 transition-colors duration-200 bg-white"
                           >
-                            {agent.name} {!agent.enabled ? "(Disabled)" : ""}
-                          </option>
-                        ))}
-                      </select>
+                            <option value="" className="text-gray-500">
+                              Select Agent
+                            </option>
+                            {aiRecruiters.map((agent) => (
+                              <option
+                                key={agent.id}
+                                value={agent.name}
+                                disabled={!agent.enabled}
+                                className={`${
+                                  !agent.enabled
+                                    ? "text-gray-400 bg-gray-100"
+                                    : "text-gray-900 hover:bg-indigo-50"
+                                }`}
+                              >
+                                {agent.name} {!agent.enabled ? "(Disabled)" : ""}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </>
                     )}
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
