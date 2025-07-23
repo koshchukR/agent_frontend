@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { apiService, type Candidate } from "../../lib/api";
+import { JobAssignmentModal } from "../JobAssignmentModal";
+import { RecruiterAssignmentModal } from "../RecruiterAssignmentModal";
+import { supabase } from "../../lib/supabase";
+import { useRecruiters } from "../../contexts/RecruitersContext";
 import {
   SearchIcon,
   FilterIcon,
@@ -13,20 +17,49 @@ import {
   ClockIcon,
   PhoneCall,
   LockIcon,
+  BriefcaseIcon,
+  PlusIcon,
+  CheckIcon,
+  PhoneIcon,
+  UserIcon,
 } from "lucide-react";
 export const CandidatesList = () => {
+  const { recruiters } = useRecruiters();
   const [sortField, setSortField] = useState("name");
   const [sortDirection, setSortDirection] = useState("asc");
   const [filterOpen, setFilterOpen] = useState(false);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [candidateJobs, setCandidateJobs] = useState<{ [key: string]: string }>(
+    {}
+  );
+  const [candidateRecruiters, setCandidateRecruiters] = useState<{
+    [key: string]: string;
+  }>({});
+  const [jobAssignmentModal, setJobAssignmentModal] = useState<{
+    isOpen: boolean;
+    candidateId: string;
+    candidateName: string;
+    currentJobId?: string;
+  }>({
+    isOpen: false,
+    candidateId: "",
+    candidateName: "",
+  });
+  const [recruiterAssignmentModal, setRecruiterAssignmentModal] = useState<{
+    isOpen: boolean;
+    candidateId: string;
+    candidateName: string;
+    currentRecruiterId?: string;
+  }>({
+    isOpen: false,
+    candidateId: "",
+    candidateName: "",
+  });
 
   const [isCalling, setIsCalling] = useState(false);
   const [activeCallId, setActiveCallId] = useState<string | null>(null);
-  const [selectedAgents, setSelectedAgents] = useState<{
-    [key: string]: string;
-  }>({});
 
   // Test users that will always appear first
   const testUsers: Candidate[] = [
@@ -40,7 +73,7 @@ export const CandidatesList = () => {
       date: "2023-06-15",
       botRisk: "Low",
       phone: "+380664374069",
-      email: "roman@example.com"
+      email: "roman@example.com",
     },
     {
       id: "test-2",
@@ -52,9 +85,60 @@ export const CandidatesList = () => {
       date: "2023-06-15",
       botRisk: "Low",
       phone: "+17373288523",
-      email: "nicolas@example.com"
-    }
+      email: "nicolas@example.com",
+    },
   ];
+
+  // Fetch job assignments for candidates
+  const fetchJobAssignments = async () => {
+    try {
+      const { data, error } = await supabase.from("candidate_job_assignments")
+        .select(`
+          candidate_id,
+          job_postings!inner(id, title)
+        `);
+
+      if (error) {
+        console.warn("Failed to fetch job assignments:", error.message);
+        return;
+      }
+
+      const jobMap: { [key: string]: string } = {};
+      data?.forEach((assignment) => {
+        jobMap[assignment.candidate_id] = assignment.job_postings.title;
+      });
+
+      setCandidateJobs(jobMap);
+    } catch (err) {
+      console.warn("Error fetching job assignments:", err);
+    }
+  };
+
+  // Fetch recruiter assignments for candidates
+  const fetchRecruiterAssignments = async () => {
+    try {
+      const { data, error } = await supabase.from(
+        "candidate_recruiter_assignments"
+      ).select(`
+          candidate_id,
+          recruiters!inner(id, name)
+        `);
+
+      if (error) {
+        console.warn("Failed to fetch recruiter assignments:", error.message);
+        return;
+      }
+
+      const recruiterMap: { [key: string]: string } = {};
+      data?.forEach((assignment) => {
+        recruiterMap[assignment.candidate_id] = assignment.recruiters.name;
+      });
+
+      setCandidateRecruiters(recruiterMap);
+    } catch (err) {
+      console.warn("Error fetching recruiter assignments:", err);
+    }
+  };
 
   // Fetch candidates from HubSpot on component mount
   useEffect(() => {
@@ -62,16 +146,25 @@ export const CandidatesList = () => {
       try {
         setLoading(true);
         setError(null);
-        
+
         const hubspotCandidates = await apiService.getHubSpotContacts();
-        
+
         // Combine test users (first) with HubSpot candidates
         setCandidates([...testUsers, ...hubspotCandidates]);
+
+        // Fetch job assignments
+        await fetchJobAssignments();
+        // Fetch recruiter assignments
+        await fetchRecruiterAssignments();
       } catch (err) {
-        console.error('Error fetching candidates:', err);
-        setError(err instanceof Error ? err.message : 'Failed to fetch candidates');
+        console.error("Error fetching candidates:", err);
+        setError(
+          err instanceof Error ? err.message : "Failed to fetch candidates"
+        );
         // Fallback to test users only if API fails
         setCandidates(testUsers);
+        await fetchJobAssignments();
+        await fetchRecruiterAssignments();
       } finally {
         setLoading(false);
       }
@@ -85,14 +178,16 @@ export const CandidatesList = () => {
       try {
         setLoading(true);
         setError(null);
-        
+
         const hubspotCandidates = await apiService.getHubSpotContacts();
-        
+
         // Combine test users (first) with HubSpot candidates
         setCandidates([...testUsers, ...hubspotCandidates]);
       } catch (err) {
-        console.error('Error fetching candidates:', err);
-        setError(err instanceof Error ? err.message : 'Failed to fetch candidates');
+        console.error("Error fetching candidates:", err);
+        setError(
+          err instanceof Error ? err.message : "Failed to fetch candidates"
+        );
         // Fallback to test users only if API fails
         setCandidates(testUsers);
       } finally {
@@ -103,51 +198,43 @@ export const CandidatesList = () => {
     fetchCandidates();
   };
 
-  const aiRecruiters = [
-    {
-      id: 1,
-      name: "Alex",
-      industry: "Software Engineering",
-      enabled: false,
-    },
-    {
-      id: 2,
-      name: "Sarah",
-      industry: "Healthcare",
-      enabled: false,
-    },
-    {
-      id: 3,
-      name: "Michael",
-      industry: "Sales & Marketing",
-      enabled: false,
-    },
-    {
-      id: 4,
-      name: "AI Recruiter Screen IQ",
-      industry: "General Recruiting",
-      enabled: true,
-    },
-  ];
-
   const isTestUser = (candidateId: string) => {
-    return candidateId.startsWith('test-');
+    return candidateId.startsWith("test-");
   };
 
-  const handleAgentSelect = (candidateId: string, agentName: string) => {
+  const handleRecruiterClick = (candidateId: string, candidateName: string) => {
     // Only allow interaction with test users
     if (!isTestUser(candidateId)) {
       return;
     }
 
-    if (agentName === "AI Recruiter Screen IQ") {
-      setSelectedAgents((prev) => ({ ...prev, [candidateId]: agentName }));
-      const candidate = candidates.find((c) => c.id.toString() === candidateId);
-      if (candidate) {
-        handleStartCall(candidate.phone, candidate.name, candidate.position);
-      }
-    } else if (agentName === "") {
-      setSelectedAgents((prev) => ({ ...prev, [candidateId]: "" }));
+    // Find the current recruiter ID for this candidate
+    const currentRecruiterName = candidateRecruiters[candidateId];
+    const currentRecruiter = recruiters.find(
+      (r) => r.name === currentRecruiterName
+    );
+
+    setRecruiterAssignmentModal({
+      isOpen: true,
+      candidateId,
+      candidateName,
+      currentRecruiterId: currentRecruiter?.id,
+    });
+  };
+
+  const handleCallClick = (candidateId: string) => {
+    // Only allow interaction with test users
+    if (!isTestUser(candidateId)) {
+      return;
+    }
+
+    const candidate = candidates.find((c) => c.id.toString() === candidateId);
+    if (
+      candidate &&
+      candidateJobs[candidateId] &&
+      candidateRecruiters[candidateId]
+    ) {
+      handleStartCall(candidate.phone, candidate.name, candidate.position);
     }
   };
 
@@ -206,6 +293,35 @@ export const CandidatesList = () => {
       setSortDirection("asc");
     }
   };
+
+  const handlePositionClick = (candidateId: string, candidateName: string) => {
+    setJobAssignmentModal({
+      isOpen: true,
+      candidateId,
+      candidateName,
+      currentJobId: undefined, // We'll implement getting the current job ID later
+    });
+  };
+
+  const handleCloseJobModal = () => {
+    setJobAssignmentModal({
+      isOpen: false,
+      candidateId: "",
+      candidateName: "",
+    });
+    // Refresh job assignments after modal closes
+    fetchJobAssignments();
+  };
+
+  const handleCloseRecruiterModal = () => {
+    setRecruiterAssignmentModal({
+      isOpen: false,
+      candidateId: "",
+      candidateName: "",
+    });
+    // Refresh recruiter assignments after modal closes
+    fetchRecruiterAssignments();
+  };
   // Show loading state
   if (loading) {
     return (
@@ -237,7 +353,8 @@ export const CandidatesList = () => {
           <div className="mt-2 bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded-md">
             <div className="flex items-center justify-between">
               <p className="text-sm">
-                <strong>Note:</strong> {error}. Showing test users and any cached data.
+                <strong>Note:</strong> {error}. Showing test users and any
+                cached data.
               </p>
               <button
                 onClick={refreshCandidates}
@@ -429,43 +546,86 @@ export const CandidatesList = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   AI Agent
                 </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Call
+                </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {candidates.map((candidate) => {
                 const isLocked = !isTestUser(candidate.id);
                 return (
-                <tr 
-                  key={candidate.id} 
-                  className={`${isLocked ? 'bg-gray-50 opacity-75' : 'hover:bg-gray-50'}`}
-                >
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0 h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center relative">
-                        {candidate.name.charAt(0)}
-                        {isLocked && (
-                          <div className="absolute -top-1 -right-1 bg-gray-600 rounded-full p-1">
-                            <LockIcon size={12} className="text-white" />
+                  <tr
+                    key={candidate.id}
+                    className={`${
+                      isLocked ? "bg-gray-50 opacity-75" : "hover:bg-gray-50"
+                    }`}
+                  >
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0 h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center relative">
+                          {candidate.name.charAt(0)}
+                          {isLocked && (
+                            <div className="absolute -top-1 -right-1 bg-gray-600 rounded-full p-1">
+                              <LockIcon size={12} className="text-white" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="ml-4">
+                          <div
+                            className={`text-sm font-medium ${
+                              isLocked ? "text-gray-500" : "text-gray-900"
+                            }`}
+                          >
+                            {candidate.name}
+                            {isLocked && (
+                              <span className="ml-2 text-xs text-gray-400">
+                                (HubSpot)
+                              </span>
+                            )}
                           </div>
+                          <div className="text-xs text-gray-500">
+                            {candidate.email ||
+                              `candidate${candidate.id}@example.com`}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <button
+                        onClick={() =>
+                          handlePositionClick(candidate.id, candidate.name)
+                        }
+                        className={`inline-flex items-center px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                          candidateJobs[candidate.id]
+                            ? "bg-green-50 text-green-700 border border-green-200 hover:bg-green-100"
+                            : "bg-gray-50 text-gray-600 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-300"
+                        }`}
+                      >
+                        {candidateJobs[candidate.id] ? (
+                          <>
+                            <CheckIcon
+                              size={16}
+                              className="mr-2 text-green-500"
+                            />
+                            <span
+                              className="truncate max-w-32"
+                              title={candidateJobs[candidate.id]}
+                            >
+                              {candidateJobs[candidate.id]}
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <PlusIcon size={16} className="mr-2" />
+                            Assign Position
+                          </>
                         )}
-                      </div>
-                      <div className="ml-4">
-                        <div className={`text-sm font-medium ${isLocked ? 'text-gray-500' : 'text-gray-900'}`}>
-                          {candidate.name}
-                          {isLocked && <span className="ml-2 text-xs text-gray-400">(HubSpot)</span>}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {candidate.email || `candidate${candidate.id}@example.com`}
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {candidate.position}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span
-                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                      </button>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span
+                        className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
                         ${
                           candidate.status === "Completed"
                             ? "bg-green-100 text-green-800"
@@ -475,142 +635,170 @@ export const CandidatesList = () => {
                             ? "bg-yellow-100 text-yellow-800"
                             : "bg-red-100 text-red-800"
                         }`}
-                    >
-                      {candidate.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {candidate.score ? (
+                      >
+                        {candidate.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {candidate.score ? (
+                        <div className="flex items-center">
+                          <span
+                            className={`font-medium ${
+                              candidate.score >= 80
+                                ? "text-green-600"
+                                : candidate.score >= 60
+                                ? "text-yellow-600"
+                                : "text-red-600"
+                            }`}
+                          >
+                            {candidate.score}/100
+                          </span>
+                        </div>
+                      ) : (
+                        <span>—</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {candidate.source}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {new Date(candidate.date).toLocaleDateString()}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
+                        {candidate.botRisk === "Low" && (
+                          <CheckCircleIcon
+                            size={16}
+                            className="text-green-500 mr-1"
+                          />
+                        )}
+                        {candidate.botRisk === "Medium" && (
+                          <AlertCircleIcon
+                            size={16}
+                            className="text-yellow-500 mr-1"
+                          />
+                        )}
+                        {candidate.botRisk === "High" && (
+                          <XCircleIcon
+                            size={16}
+                            className="text-red-500 mr-1"
+                          />
+                        )}
+                        {candidate.botRisk === "Unknown" && (
+                          <ClockIcon size={16} className="text-gray-400 mr-1" />
+                        )}
                         <span
-                          className={`font-medium ${
-                            candidate.score >= 80
+                          className={`text-sm ${
+                            candidate.botRisk === "Low"
                               ? "text-green-600"
-                              : candidate.score >= 60
+                              : candidate.botRisk === "Medium"
                               ? "text-yellow-600"
-                              : "text-red-600"
+                              : candidate.botRisk === "High"
+                              ? "text-red-600"
+                              : "text-gray-500"
                           }`}
                         >
-                          {candidate.score}/100
+                          {candidate.botRisk}
                         </span>
                       </div>
-                    ) : (
-                      <span>—</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {candidate.source}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(candidate.date).toLocaleDateString()}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      {candidate.botRisk === "Low" && (
-                        <CheckCircleIcon
-                          size={16}
-                          className="text-green-500 mr-1"
-                        />
-                      )}
-                      {candidate.botRisk === "Medium" && (
-                        <AlertCircleIcon
-                          size={16}
-                          className="text-yellow-500 mr-1"
-                        />
-                      )}
-                      {candidate.botRisk === "High" && (
-                        <XCircleIcon size={16} className="text-red-500 mr-1" />
-                      )}
-                      {candidate.botRisk === "Unknown" && (
-                        <ClockIcon size={16} className="text-gray-400 mr-1" />
-                      )}
-                      <span
-                        className={`text-sm ${
-                          candidate.botRisk === "Low"
-                            ? "text-green-600"
-                            : candidate.botRisk === "Medium"
-                            ? "text-yellow-600"
-                            : candidate.botRisk === "High"
-                            ? "text-red-600"
-                            : "text-gray-500"
-                        }`}
-                      >
-                        {candidate.botRisk}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    {isLocked ? (
-                      <div className="flex items-center justify-end space-x-3">
-                        <span className="text-gray-400 cursor-not-allowed">View</span>
-                        <span className="text-gray-400 cursor-not-allowed">More</span>
-                        <LockIcon size={14} className="text-gray-400" />
-                      </div>
-                    ) : (
-                      <>
-                        <Link
-                          to={`/dashboard/candidates/${candidate.id}`}
-                          className="text-indigo-600 hover:text-indigo-900 mr-3"
-                        >
-                          View
-                        </Link>
-                        <button className="text-gray-600 hover:text-gray-900">
-                          More
-                        </button>
-                      </>
-                    )}
-                  </td>
-                  <td className="py-3 px-4 border-b relative">
-                    {isLocked ? (
-                      <div className="flex items-center justify-center bg-gray-100 border border-gray-200 rounded-md px-3 py-2">
-                        <LockIcon size={16} className="text-gray-400 mr-2" />
-                        <span className="text-sm text-gray-500">Locked</span>
-                      </div>
-                    ) : (
-                      <>
-                        {isCalling && activeCallId === candidate.phone ? (
-                          <div className="absolute inset-0 flex items-center justify-center bg-blue-50 border border-blue-200 rounded-md">
-                            <div className="flex items-center space-x-2">
-                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                              <span className="text-sm font-medium text-blue-600">
-                                Calling...
-                              </span>
-                            </div>
-                          </div>
-                        ) : (
-                          <select
-                            value={selectedAgents[candidate.id] || ""}
-                            onChange={(e) =>
-                              handleAgentSelect(
-                                candidate.id.toString(),
-                                e.target.value
-                              )
-                            }
-                            className="block w-full px-3 py-2 text-sm border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-gray-400 transition-colors duration-200 bg-white"
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      {isLocked ? (
+                        <div className="flex items-center justify-end space-x-3">
+                          <span className="text-gray-400 cursor-not-allowed">
+                            View
+                          </span>
+                          <LockIcon size={14} className="text-gray-400" />
+                        </div>
+                      ) : (
+                        <>
+                          <Link
+                            to={`/dashboard/candidates/${candidate.id}`}
+                            className="text-indigo-600 hover:text-indigo-900 mr-3"
                           >
-                            <option value="" className="text-gray-500">
-                              Select Agent
-                            </option>
-                            {aiRecruiters.map((agent) => (
-                              <option
-                                key={agent.id}
-                                value={agent.name}
-                                disabled={!agent.enabled}
-                                className={`${
-                                  !agent.enabled
-                                    ? "text-gray-400 bg-gray-100"
-                                    : "text-gray-900 hover:bg-indigo-50"
-                                }`}
+                            View
+                          </Link>
+                        </>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {isLocked ? (
+                        <div className="flex items-center justify-center bg-gray-100 border border-gray-200 rounded-md px-3 py-2">
+                          <LockIcon size={16} className="text-gray-400 mr-2" />
+                          <span className="text-sm text-gray-500">Locked</span>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() =>
+                            handleRecruiterClick(candidate.id, candidate.name)
+                          }
+                          className={`inline-flex items-center px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                            candidateRecruiters[candidate.id]
+                              ? "bg-green-50 text-green-700 border border-green-200 hover:bg-green-100"
+                              : "bg-gray-50 text-gray-600 border border-gray-200 hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-300"
+                          }`}
+                        >
+                          {candidateRecruiters[candidate.id] ? (
+                            <>
+                              <CheckIcon
+                                size={16}
+                                className="mr-2 text-green-500"
+                              />
+                              <span
+                                className="truncate max-w-32"
+                                title={candidateRecruiters[candidate.id]}
                               >
-                                {agent.name} {!agent.enabled ? "(Disabled)" : ""}
-                              </option>
-                            ))}
-                          </select>
-                        )}
-                      </>
-                    )}
-                  </td>
-                </tr>
+                                {candidateRecruiters[candidate.id]}
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <UserIcon size={16} className="mr-2" />
+                              Assign Agent
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {isLocked ? (
+                        <div className="flex items-center justify-center bg-gray-100 border border-gray-200 rounded-md px-3 py-2">
+                          <LockIcon size={16} className="text-gray-400 mr-2" />
+                          <span className="text-sm text-gray-500">Locked</span>
+                        </div>
+                      ) : (
+                        <>
+                          {isCalling && activeCallId === candidate.phone ? (
+                            <div className="flex items-center justify-center bg-blue-50 border border-blue-200 rounded-md px-3 py-2">
+                              <div className="flex items-center space-x-2">
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                                <span className="text-sm font-medium text-blue-600">
+                                  Calling...
+                                </span>
+                              </div>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => handleCallClick(candidate.id)}
+                              disabled={
+                                !candidateJobs[candidate.id] ||
+                                !candidateRecruiters[candidate.id]
+                              }
+                              className={`inline-flex items-center px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                                candidateJobs[candidate.id] &&
+                                candidateRecruiters[candidate.id]
+                                  ? "bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500"
+                                  : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                              }`}
+                            >
+                              <PhoneIcon size={16} className="mr-2" />
+                              Call
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </td>
+                  </tr>
                 );
               })}
             </tbody>
@@ -663,6 +851,24 @@ export const CandidatesList = () => {
           </div>
         </div>
       </div>
+
+      {/* Job Assignment Modal */}
+      <JobAssignmentModal
+        isOpen={jobAssignmentModal.isOpen}
+        onClose={handleCloseJobModal}
+        candidateId={jobAssignmentModal.candidateId}
+        candidateName={jobAssignmentModal.candidateName}
+        currentJobId={jobAssignmentModal.currentJobId}
+      />
+
+      {/* Recruiter Assignment Modal */}
+      <RecruiterAssignmentModal
+        isOpen={recruiterAssignmentModal.isOpen}
+        onClose={handleCloseRecruiterModal}
+        candidateId={recruiterAssignmentModal.candidateId}
+        candidateName={recruiterAssignmentModal.candidateName}
+        currentRecruiterId={recruiterAssignmentModal.currentRecruiterId}
+      />
     </div>
   );
 };

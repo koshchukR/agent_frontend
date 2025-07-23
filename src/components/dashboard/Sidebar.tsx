@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboardIcon, UsersIcon, BarChart2Icon, ScaleIcon, CalendarIcon, SettingsIcon, HelpCircleIcon, LogOutIcon, BotIcon, MessageSquareIcon } from 'lucide-react';
+import { LayoutDashboardIcon, UsersIcon, BarChart2Icon, ScaleIcon, CalendarIcon, SettingsIcon, HelpCircleIcon, LogOutIcon, BotIcon, MessageSquareIcon, BriefcaseIcon } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 interface SidebarProps {
   isOpen: boolean;
@@ -20,6 +20,11 @@ export const Sidebar = ({
     icon: <UsersIcon size={20} />,
     path: '/dashboard/candidates',
     active: location.pathname.includes('/dashboard/candidates')
+  }, {
+    label: 'Jobs',
+    icon: <BriefcaseIcon size={20} />,
+    path: '/dashboard/jobs',
+    active: location.pathname.includes('/dashboard/jobs')
   }, {
     label: 'Compare',
     icon: <ScaleIcon size={20} />,
