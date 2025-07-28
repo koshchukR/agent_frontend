@@ -229,12 +229,14 @@ export const CandidatesList = () => {
     }
 
     const candidate = candidates.find((c) => c.id.toString() === candidateId);
+    const assignedJobTitle = candidateJobs[candidateId];
+    
     if (
       candidate &&
-      candidateJobs[candidateId] &&
+      assignedJobTitle &&
       candidateRecruiters[candidateId]
     ) {
-      handleStartCall(candidate.phone, candidate.name, candidate.position);
+      handleStartCall(candidate.phone, candidate.name, assignedJobTitle);
     }
   };
 

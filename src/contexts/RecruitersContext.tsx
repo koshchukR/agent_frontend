@@ -5,8 +5,21 @@ import { useAuth } from './AuthContext'
 export interface Recruiter {
   id: string
   name: string
+  avatar: string
+  email?: string
+  phone?: string
+  voice?: string
+  personality: string[] | null
   industry: string
   enabled: boolean
+  scheduled_interviews: number
+  completed_interviews: number
+  total_minutes: number
+  avg_time_minutes: number
+  success_rate: number
+  monthly_cost: number
+  cost_per_interview: number
+  total_cost: number
   created_at: string
   updated_at: string
   created_by: string
@@ -39,13 +52,26 @@ export const RecruitersProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [error, setError] = useState<string | null>(null)
   const { user } = useAuth()
 
-  // Sample data for development - will be replaced with Supabase data
+  // Sample data for development fallback
   const sampleRecruiters: Recruiter[] = [
     {
       id: '550e8400-e29b-41d4-a716-446655440001',
       name: 'Alex',
+      avatar: 'A',
+      email: 'alex.ai@talentmatch.ai',
+      phone: '+1 (555) 123-4567',
+      voice: 'American English - Male',
+      personality: ['Friendly', 'Professional', 'Detailed'],
       industry: 'Software Engineering',
       enabled: false,
+      scheduled_interviews: 48,
+      completed_interviews: 42,
+      total_minutes: 1260,
+      avg_time_minutes: 30.0,
+      success_rate: 78.0,
+      monthly_cost: 299.00,
+      cost_per_interview: 7.12,
+      total_cost: 1495.00,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       created_by: 'system'
@@ -53,8 +79,21 @@ export const RecruitersProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     {
       id: '550e8400-e29b-41d4-a716-446655440002',
       name: 'Sarah',
+      avatar: 'S',
+      email: 'sarah.ai@talentmatch.ai',
+      phone: '+1 (555) 987-6543',
+      voice: 'British English - Female',
+      personality: ['Empathetic', 'Analytical', 'Concise'],
       industry: 'Healthcare',
       enabled: false,
+      scheduled_interviews: 36,
+      completed_interviews: 33,
+      total_minutes: 990,
+      avg_time_minutes: 27.5,
+      success_rate: 82.0,
+      monthly_cost: 299.00,
+      cost_per_interview: 9.06,
+      total_cost: 1197.00,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       created_by: 'system'
@@ -62,8 +101,21 @@ export const RecruitersProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     {
       id: '550e8400-e29b-41d4-a716-446655440003',
       name: 'Michael',
+      avatar: 'M',
+      email: 'michael.ai@talentmatch.ai',
+      phone: '+1 (555) 456-7890',
+      voice: 'Australian English - Male',
+      personality: ['Enthusiastic', 'Direct', 'Thorough'],
       industry: 'Sales & Marketing',
       enabled: false,
+      scheduled_interviews: 54,
+      completed_interviews: 51,
+      total_minutes: 1530,
+      avg_time_minutes: 28.3,
+      success_rate: 75.0,
+      monthly_cost: 299.00,
+      cost_per_interview: 5.86,
+      total_cost: 1794.00,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       created_by: 'system'
@@ -71,8 +123,21 @@ export const RecruitersProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     {
       id: '550e8400-e29b-41d4-a716-446655440004',
       name: 'AI Recruiter Screen IQ',
+      avatar: 'AI',
+      email: 'screeniq.ai@talentmatch.ai',
+      phone: '+1 (737) 276-5152',
+      voice: 'American English - Male',
+      personality: ['Professional', 'Analytical', 'Thorough'],
       industry: 'General Recruiting',
       enabled: true,
+      scheduled_interviews: 25,
+      completed_interviews: 22,
+      total_minutes: 660,
+      avg_time_minutes: 30.0,
+      success_rate: 88.0,
+      monthly_cost: 299.00,
+      cost_per_interview: 13.59,
+      total_cost: 897.00,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       created_by: 'system'
@@ -135,8 +200,21 @@ export const RecruitersProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
       const recruiterPayload = {
         name: recruiterData.name,
+        avatar: recruiterData.avatar,
+        email: recruiterData.email,
+        phone: recruiterData.phone,
+        voice: recruiterData.voice,
+        personality: recruiterData.personality,
         industry: recruiterData.industry,
         enabled: recruiterData.enabled,
+        scheduled_interviews: recruiterData.scheduled_interviews || 0,
+        completed_interviews: recruiterData.completed_interviews || 0,
+        total_minutes: recruiterData.total_minutes || 0,
+        avg_time_minutes: recruiterData.avg_time_minutes || 0,
+        success_rate: recruiterData.success_rate || 0,
+        monthly_cost: recruiterData.monthly_cost || 299.00,
+        cost_per_interview: recruiterData.cost_per_interview || 0,
+        total_cost: recruiterData.total_cost || 0,
         created_by: user.id
       }
 
@@ -172,8 +250,21 @@ export const RecruitersProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       // Clean the updates object to only include database fields
       const updatePayload = {
         name: updates.name,
+        avatar: updates.avatar,
+        email: updates.email,
+        phone: updates.phone,
+        voice: updates.voice,
+        personality: updates.personality,
         industry: updates.industry,
         enabled: updates.enabled,
+        scheduled_interviews: updates.scheduled_interviews,
+        completed_interviews: updates.completed_interviews,
+        total_minutes: updates.total_minutes,
+        avg_time_minutes: updates.avg_time_minutes,
+        success_rate: updates.success_rate,
+        monthly_cost: updates.monthly_cost,
+        cost_per_interview: updates.cost_per_interview,
+        total_cost: updates.total_cost,
         updated_at: new Date().toISOString()
       }
 

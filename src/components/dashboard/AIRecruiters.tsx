@@ -1,99 +1,43 @@
 import React, { useState } from "react";
 import { AIRecruiterCard } from "./AIRecruiterCard";
 import { AddAIRecruiterCard } from "./AddAIRecruiterCard";
+import { useRecruiters } from "../../contexts/RecruitersContext";
+
 export const AIRecruiters = () => {
   const [showAddModal, setShowAddModal] = useState(false);
-  // Sample data for AI recruiters
-  const recruiters = [
-    {
-      id: 1,
-      name: "Alex",
-      avatar: "A",
-      email: "alex.ai@talentmatch.ai",
-      phone: "+1 (555) 123-4567",
-      voice: "American English - Male",
-      personality: ["Friendly", "Professional", "Detailed"],
-      industry: "Software Engineering",
-      stats: {
-        scheduled: 48,
-        completed: 42,
-        minutes: 1260,
-        avgTime: 30,
-        successRate: 78,
-        cost: {
-          monthly: 299,
-          perInterview: 7.12,
-          total: 1495,
-        },
+  const { recruiters, loading, error } = useRecruiters();
+
+  // Transform recruiter data to match the expected format for AIRecruiterCard
+  const transformedRecruiters = recruiters.map(recruiter => ({
+    id: recruiter.id,
+    name: recruiter.name,
+    avatar: recruiter.avatar,
+    email: recruiter.email || '',
+    phone: recruiter.phone || '',
+    voice: recruiter.voice || '',
+    personality: recruiter.personality || [],
+    industry: recruiter.industry,
+    stats: {
+      scheduled: recruiter.scheduled_interviews,
+      completed: recruiter.completed_interviews,
+      minutes: recruiter.total_minutes,
+      avgTime: recruiter.avg_time_minutes,
+      successRate: recruiter.success_rate,
+      cost: {
+        monthly: recruiter.monthly_cost,
+        perInterview: recruiter.cost_per_interview,
+        total: recruiter.total_cost,
       },
     },
-    {
-      id: 2,
-      name: "Sarah",
-      avatar: "S",
-      email: "sarah.ai@talentmatch.ai",
-      phone: "+1 (555) 987-6543",
-      voice: "British English - Female",
-      personality: ["Empathetic", "Analytical", "Concise"],
-      industry: "Healthcare",
-      stats: {
-        scheduled: 36,
-        completed: 33,
-        minutes: 990,
-        avgTime: 27.5,
-        successRate: 82,
-        cost: {
-          monthly: 299,
-          perInterview: 9.06,
-          total: 1197,
-        },
-      },
-    },
-    {
-      id: 3,
-      name: "Michael",
-      avatar: "M",
-      email: "michael.ai@talentmatch.ai",
-      phone: "+1 (555) 456-7890",
-      voice: "Australian English - Male",
-      personality: ["Enthusiastic", "Direct", "Thorough"],
-      industry: "Sales & Marketing",
-      stats: {
-        scheduled: 54,
-        completed: 51,
-        minutes: 1530,
-        avgTime: 28.3,
-        successRate: 75,
-        cost: {
-          monthly: 299,
-          perInterview: 5.86,
-          total: 1794,
-        },
-      },
-    },
-    {
-      id: 4,
-      name: "AI Recruiter Screen IQ",
-      avatar: "AI",
-      email: "screeniq.ai@talentmatch.ai",
-      phone: "+1 (737) 276-5152",
-      voice: "American English - Male",
-      personality: ["Professional", "Analytical", "Thorough"],
-      industry: "General Recruiting",
-      stats: {
-        scheduled: 25,
-        completed: 22,
-        minutes: 660,
-        avgTime: 30,
-        successRate: 88,
-        cost: {
-          monthly: 299,
-          perInterview: 13.59,
-          total: 897,
-        },
-      },
-    },
-  ];
+  }));
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-gray-500">Loading recruiters...</div>
+      </div>
+    );
+  }
   return (
     <div>
       <div className="mb-6">
@@ -101,9 +45,14 @@ export const AIRecruiters = () => {
         <p className="text-gray-600">
           Manage your virtual recruiting team and their performance.
         </p>
+        {error && (
+          <div className="mt-2 p-3 bg-yellow-100 border border-yellow-300 rounded-md">
+            <p className="text-yellow-800 text-sm">{error}</p>
+          </div>
+        )}
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {recruiters.map((recruiter) => (
+        {transformedRecruiters.map((recruiter) => (
           <AIRecruiterCard key={recruiter.id} recruiter={recruiter} />
         ))}
         <AddAIRecruiterCard onAdd={() => setShowAddModal(true)} />
