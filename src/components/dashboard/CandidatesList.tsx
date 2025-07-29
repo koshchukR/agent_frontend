@@ -34,6 +34,9 @@ export const CandidatesList = () => {
   const [candidateJobs, setCandidateJobs] = useState<{ [key: string]: string }>(
     {}
   );
+  const [candidateJobIds, setCandidateJobIds] = useState<{ [key: string]: string }>(
+    {}
+  );
   const [candidateRecruiters, setCandidateRecruiters] = useState<{
     [key: string]: string;
   }>({});
@@ -104,11 +107,14 @@ export const CandidatesList = () => {
       }
 
       const jobMap: { [key: string]: string } = {};
+      const jobIdMap: { [key: string]: string } = {};
       data?.forEach((assignment) => {
         jobMap[assignment.candidate_id] = assignment.job_postings.title;
+        jobIdMap[assignment.candidate_id] = assignment.job_postings.id;
       });
 
       setCandidateJobs(jobMap);
+      setCandidateJobIds(jobIdMap);
     } catch (err) {
       console.warn("Error fetching job assignments:", err);
     }
@@ -230,16 +236,26 @@ export const CandidatesList = () => {
 
     const candidate = candidates.find((c) => c.id.toString() === candidateId);
     const assignedJobTitle = candidateJobs[candidateId];
+    const assignedRecruiterName = candidateRecruiters[candidateId];
     
     if (
       candidate &&
       assignedJobTitle &&
-      candidateRecruiters[candidateId]
+      assignedRecruiterName
     ) {
-      handleStartCall(candidate.phone, candidate.name, assignedJobTitle);
+      // Route to appropriate call handler based on assigned recruiter
+      if (assignedRecruiterName === '11Labs Recruiter') {
+        handleStartCall11Labs(candidate.phone, candidate.name, assignedJobTitle);
+      } else if (assignedRecruiterName === 'AI Recruiter Screen IQ') {
+        handleStartCall(candidate.phone, candidate.name, assignedJobTitle);
+      } else {
+        // Default to Bland AI for other recruiters (disabled for now)
+        alert('Call functionality is only available for AI Recruiter Screen IQ and 11Labs Recruiter');
+      }
     }
   };
 
+  // Bland AI call function (for AI Recruiter Screen IQ)
   const handleStartCall = async (
     phone: string,
     name: string,
@@ -267,10 +283,58 @@ export const CandidatesList = () => {
       const data = await res.json();
 
       if (res.ok) {
-        console.log("Call started:", data);
-        alert(`Call initiated to ${phone}`);
+        console.log("Bland AI call started:", data);
+        alert(`Call initiated to ${phone} via AI Recruiter Screen IQ`);
       } else {
-        console.error("Call error:", data);
+        console.error("Bland AI call error:", data);
+        alert("Call failed: " + (data.error || "Unknown error"));
+      }
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        console.error("Network error:", err.message);
+        alert("Network error: " + err.message);
+      } else {
+        console.error("Unknown error:", err);
+        alert("Unknown error occurred");
+      }
+    } finally {
+      setIsCalling(false);
+      setActiveCallId(null);
+    }
+  };
+
+  // 11Labs call function (for 11Labs Recruiter)
+  const handleStartCall11Labs = async (
+    phone: string,
+    candidate_name: string,
+    job_title: string
+  ): Promise<void> => {
+    try {
+      setIsCalling(true);
+      setActiveCallId(phone);
+
+      const res = await fetch(
+        "https://recruiter-agent-backend-sznn.onrender.com/elevenlabs/call",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            phone,
+            candidate_name,
+            job_title,
+          }),
+        }
+      );
+
+      const data = await res.json();
+
+      if (res.ok) {
+        console.log("11Labs call started:", data);
+        alert(`Call initiated to ${phone} via 11Labs Recruiter`);
+      } else {
+        console.error("11Labs call error:", data);
         alert("Call failed: " + (data.error || "Unknown error"));
       }
     } catch (err: unknown) {
@@ -301,7 +365,7 @@ export const CandidatesList = () => {
       isOpen: true,
       candidateId,
       candidateName,
-      currentJobId: undefined, // We'll implement getting the current job ID later
+      currentJobId: candidateJobIds[candidateId], // Get the actual current job ID
     });
   };
 
@@ -784,17 +848,27 @@ export const CandidatesList = () => {
                               onClick={() => handleCallClick(candidate.id)}
                               disabled={
                                 !candidateJobs[candidate.id] ||
-                                !candidateRecruiters[candidate.id]
+                                !candidateRecruiters[candidate.id] ||
+                                (candidateRecruiters[candidate.id] !== 'AI Recruiter Screen IQ' && 
+                                 candidateRecruiters[candidate.id] !== '11Labs Recruiter')
                               }
                               className={`inline-flex items-center px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
                                 candidateJobs[candidate.id] &&
-                                candidateRecruiters[candidate.id]
+                                candidateRecruiters[candidate.id] &&
+                                (candidateRecruiters[candidate.id] === 'AI Recruiter Screen IQ' || 
+                                 candidateRecruiters[candidate.id] === '11Labs Recruiter')
                                   ? "bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500"
                                   : "bg-gray-200 text-gray-400 cursor-not-allowed"
                               }`}
+                              title={candidateRecruiters[candidate.id] ? 
+                                `Call via ${candidateRecruiters[candidate.id]}` : 
+                                'Assign a recruiter to enable calling'
+                              }
                             >
                               <PhoneIcon size={16} className="mr-2" />
-                              Call
+                              {candidateRecruiters[candidate.id] === '11Labs Recruiter' ? 'Call (11Labs)' :
+                               candidateRecruiters[candidate.id] === 'AI Recruiter Screen IQ' ? 'Call (Bland AI)' :
+                               'Call'}
                             </button>
                           )}
                         </>

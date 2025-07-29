@@ -185,18 +185,6 @@ export const RecruiterAssignmentModal: React.FC<RecruiterAssignmentModalProps> =
               </div>
             )}
 
-            {/* Remove All Assignments Button (when no current assignment but want to clear any) */}
-            {!currentRecruiterId && (
-              <div className="mb-4">
-                <button
-                  onClick={handleRemoveAssignment}
-                  disabled={isAssigning}
-                  className="w-full px-4 py-2 border border-red-300 rounded-md text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 disabled:opacity-50 transition-colors"
-                >
-                  {isAssigning ? 'Removing...' : 'Remove Any Existing Recruiter Assignment'}
-                </button>
-              </div>
-            )}
 
             {/* Recruiter List */}
             <div className="max-h-64 overflow-y-auto border border-gray-200 rounded-md">
@@ -328,15 +316,6 @@ export const RecruiterAssignmentModal: React.FC<RecruiterAssignmentModalProps> =
               )}
             </button>
             
-            {/* Clear Assignment Button */}
-            <button
-              type="button"
-              onClick={handleRemoveAssignment}
-              disabled={isAssigning}
-              className="mt-3 w-full inline-flex justify-center rounded-md border border-red-300 shadow-sm px-4 py-2 bg-red-50 text-base font-medium text-red-700 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50 transition-colors"
-            >
-              {isAssigning ? 'Removing...' : 'Clear Assignment'}
-            </button>
             
             <button
               type="button"

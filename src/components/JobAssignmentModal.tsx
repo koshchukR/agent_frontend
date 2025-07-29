@@ -183,18 +183,6 @@ export const JobAssignmentModal: React.FC<JobAssignmentModalProps> = ({
               </div>
             )}
 
-            {/* Remove All Assignments Button (when no current assignment but want to clear any) */}
-            {!currentJobId && (
-              <div className="mb-4">
-                <button
-                  onClick={handleRemoveAssignment}
-                  disabled={isAssigning}
-                  className="w-full px-4 py-2 border border-red-300 rounded-md text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 disabled:opacity-50 transition-colors"
-                >
-                  {isAssigning ? 'Removing...' : 'Remove Any Existing Job Assignment'}
-                </button>
-              </div>
-            )}
 
             {/* Job List */}
             <div className="max-h-64 overflow-y-auto border border-gray-200 rounded-md">

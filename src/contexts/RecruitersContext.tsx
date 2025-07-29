@@ -141,6 +141,28 @@ export const RecruitersProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       created_by: 'system'
+    },
+    {
+      id: '550e8400-e29b-41d4-a716-446655440005',
+      name: '11Labs Recruiter',
+      avatar: '11',
+      email: '11labs.ai@talentmatch.ai',
+      phone: '+1 (555) 111-2233',
+      voice: 'American English - Female',
+      personality: ['Conversational', 'Natural', 'Engaging'],
+      industry: 'General Recruiting',
+      enabled: true,
+      scheduled_interviews: 18,
+      completed_interviews: 16,
+      total_minutes: 480,
+      avg_time_minutes: 30.0,
+      success_rate: 89.0,
+      monthly_cost: 399.00,
+      cost_per_interview: 24.94,
+      total_cost: 639.00,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      created_by: 'system'
     }
   ]
 

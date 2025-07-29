@@ -11,16 +11,28 @@ import {
   EditIcon,
   ShareIcon,
   BookmarkIcon,
-  CheckCircleIcon
+  CheckCircleIcon,
+  TrashIcon
 } from 'lucide-react'
 import { useJobs } from '../contexts/JobsContext'
 import { JobFormModal } from '../components/JobFormModal'
+import { DeleteConfirmationModal } from '../components/DeleteConfirmationModal'
 
 export const JobDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { getJobById, loading } = useJobs()
+  const { getJobById, loading, deleteJob } = useJobs()
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [deleteModal, setDeleteModal] = useState<{
+    isOpen: boolean;
+    jobId: string;
+    jobTitle: string;
+  }>({
+    isOpen: false,
+    jobId: "",
+    jobTitle: "",
+  })
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const job = id ? getJobById(id) : null
 
@@ -124,6 +136,17 @@ export const JobDetails: React.FC = () => {
             >
               <EditIcon size={16} className="mr-2" />
               Edit Job
+            </button>
+            <button 
+              onClick={() => setDeleteModal({
+                isOpen: true,
+                jobId: job.id,
+                jobTitle: job.title,
+              })}
+              className="inline-flex items-center px-4 py-2 border border-red-300 rounded-md text-sm font-medium text-red-700 bg-white hover:bg-red-50"
+            >
+              <TrashIcon size={16} className="mr-2" />
+              Delete Job
             </button>
           </div>
         </div>
@@ -305,6 +328,33 @@ export const JobDetails: React.FC = () => {
           jobToEdit={job}
         />
       )}
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmationModal
+        isOpen={deleteModal.isOpen}
+        onClose={() => setDeleteModal({ isOpen: false, jobId: "", jobTitle: "" })}
+        onConfirm={async () => {
+          setIsDeleting(true)
+          try {
+            const result = await deleteJob(deleteModal.jobId)
+            if (result.success) {
+              setDeleteModal({ isOpen: false, jobId: "", jobTitle: "" })
+              navigate('/dashboard/jobs')
+            } else {
+              alert(`Failed to delete job: ${result.error}`)
+            }
+          } catch (error) {
+            alert('An error occurred while deleting the job')
+            console.error('Delete job error:', error)
+          } finally {
+            setIsDeleting(false)
+          }
+        }}
+        title="Delete Job Posting"
+        message="Are you sure you want to delete this job posting? All associated data will be permanently removed."
+        itemName={deleteModal.jobTitle}
+        isDeleting={isDeleting}
+      />
     </div>
   )
 }
