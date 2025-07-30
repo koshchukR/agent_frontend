@@ -1,10 +1,15 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { apiService, type Candidate } from "../../lib/api";
 import { JobAssignmentModal } from "../JobAssignmentModal";
 import { RecruiterAssignmentModal } from "../RecruiterAssignmentModal";
+import { CandidateFormModal } from "../CandidateFormModal";
+import { DeleteConfirmationModal } from "../DeleteConfirmationModal";
 import { supabase } from "../../lib/supabase";
 import { useRecruiters } from "../../contexts/RecruitersContext";
+import {
+  useCandidates,
+  type Candidate,
+} from "../../contexts/CandidatesContext";
 import {
   SearchIcon,
   FilterIcon,
@@ -22,21 +27,34 @@ import {
   CheckIcon,
   PhoneIcon,
   UserIcon,
+  MoreVerticalIcon,
+  TrashIcon,
+  EditIcon,
 } from "lucide-react";
 export const CandidatesList = () => {
   const { recruiters } = useRecruiters();
+  const { candidates, loading, error, refreshCandidates, deleteCandidate } =
+    useCandidates();
   const [sortField, setSortField] = useState("name");
   const [sortDirection, setSortDirection] = useState("asc");
   const [filterOpen, setFilterOpen] = useState(false);
-  const [candidates, setCandidates] = useState<Candidate[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [candidateFormModal, setCandidateFormModal] = useState<{
+    isOpen: boolean;
+    candidateToEdit?: Candidate | null;
+  }>({ isOpen: false, candidateToEdit: null });
+  const [deleteModal, setDeleteModal] = useState<{
+    isOpen: boolean;
+    candidateId: string;
+    candidateName: string;
+  }>({ isOpen: false, candidateId: "", candidateName: "" });
+  const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+  const [isDeletingCandidate, setIsDeletingCandidate] = useState(false);
   const [candidateJobs, setCandidateJobs] = useState<{ [key: string]: string }>(
     {}
   );
-  const [candidateJobIds, setCandidateJobIds] = useState<{ [key: string]: string }>(
-    {}
-  );
+  const [candidateJobIds, setCandidateJobIds] = useState<{
+    [key: string]: string;
+  }>({});
   const [candidateRecruiters, setCandidateRecruiters] = useState<{
     [key: string]: string;
   }>({});
@@ -64,33 +82,17 @@ export const CandidatesList = () => {
   const [isCalling, setIsCalling] = useState(false);
   const [activeCallId, setActiveCallId] = useState<string | null>(null);
 
-  // Test users that will always appear first
-  const testUsers: Candidate[] = [
-    {
-      id: "test-1",
-      name: "Roman Koshchuk",
-      position: "Senior Developer",
-      status: "Scheduled",
-      score: 92,
-      source: "LinkedIn",
-      date: "2023-06-15",
-      botRisk: "Low",
-      phone: "+380664374069",
-      email: "roman@example.com",
-    },
-    {
-      id: "test-2",
-      name: "Nicolas Thatcher",
-      position: "Electrician",
-      status: "Scheduled",
-      score: 92,
-      source: "LinkedIn",
-      date: "2023-06-15",
-      botRisk: "Low",
-      phone: "+17373288523",
-      email: "nicolas@example.com",
-    },
-  ];
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => {
+      setActiveDropdown(null);
+    };
+
+    if (activeDropdown) {
+      document.addEventListener("click", handleClickOutside);
+      return () => document.removeEventListener("click", handleClickOutside);
+    }
+  }, [activeDropdown]);
 
   // Fetch job assignments for candidates
   const fetchJobAssignments = async () => {
@@ -146,71 +148,81 @@ export const CandidatesList = () => {
     }
   };
 
-  // Fetch candidates from HubSpot on component mount
+  // Fetch assignments on component mount
   useEffect(() => {
-    const fetchCandidates = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        const hubspotCandidates = await apiService.getHubSpotContacts();
-
-        // Combine test users (first) with HubSpot candidates
-        setCandidates([...testUsers, ...hubspotCandidates]);
-
-        // Fetch job assignments
-        await fetchJobAssignments();
-        // Fetch recruiter assignments
-        await fetchRecruiterAssignments();
-      } catch (err) {
-        console.error("Error fetching candidates:", err);
-        setError(
-          err instanceof Error ? err.message : "Failed to fetch candidates"
-        );
-        // Fallback to test users only if API fails
-        setCandidates(testUsers);
-        await fetchJobAssignments();
-        await fetchRecruiterAssignments();
-      } finally {
-        setLoading(false);
-      }
+    const fetchAssignments = async () => {
+      // Fetch job assignments
+      await fetchJobAssignments();
+      // Fetch recruiter assignments
+      await fetchRecruiterAssignments();
     };
 
-    fetchCandidates();
-  }, []);
+    fetchAssignments();
+  }, [candidates]); // Re-fetch assignments when candidates change
 
-  const refreshCandidates = () => {
-    const fetchCandidates = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        const hubspotCandidates = await apiService.getHubSpotContacts();
-
-        // Combine test users (first) with HubSpot candidates
-        setCandidates([...testUsers, ...hubspotCandidates]);
-      } catch (err) {
-        console.error("Error fetching candidates:", err);
-        setError(
-          err instanceof Error ? err.message : "Failed to fetch candidates"
-        );
-        // Fallback to test users only if API fails
-        setCandidates(testUsers);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchCandidates();
+  const handleRefreshCandidates = async () => {
+    await refreshCandidates();
+    // Re-fetch assignments after refreshing candidates
+    await fetchJobAssignments();
+    await fetchRecruiterAssignments();
   };
 
-  const isTestUser = (candidateId: string) => {
-    return candidateId.startsWith("test-");
+  const handleAddCandidate = () => {
+    setCandidateFormModal({ isOpen: true, candidateToEdit: null });
+  };
+
+  const handleEditCandidate = (candidate: Candidate) => {
+    setActiveDropdown(null);
+    setCandidateFormModal({ isOpen: true, candidateToEdit: candidate });
+  };
+
+  const handleDeleteClick = (candidateId: string, candidateName: string) => {
+    setActiveDropdown(null);
+    setDeleteModal({ isOpen: true, candidateId, candidateName });
+  };
+
+  const handleDeleteConfirm = async () => {
+    setIsDeletingCandidate(true);
+    try {
+      const result = await deleteCandidate(deleteModal.candidateId);
+      if (result.success) {
+        setDeleteModal({ isOpen: false, candidateId: "", candidateName: "" });
+        // Refresh assignments after deleting candidate
+        await fetchJobAssignments();
+        await fetchRecruiterAssignments();
+      } else {
+        alert(`Failed to delete candidate: ${result.error}`);
+      }
+    } catch (error) {
+      alert("An error occurred while deleting the candidate");
+      console.error("Delete candidate error:", error);
+    } finally {
+      setIsDeletingCandidate(false);
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteModal({ isOpen: false, candidateId: "", candidateName: "" });
+  };
+
+  const toggleDropdown = (candidateId: string) => {
+    setActiveDropdown(activeDropdown === candidateId ? null : candidateId);
+  };
+
+  const handleCloseCandidateModal = async () => {
+    setCandidateFormModal({ isOpen: false, candidateToEdit: null });
+    // Refresh candidates and assignments after modal closes
+    await handleRefreshCandidates();
+  };
+
+  const isInteractiveCandidate = (candidateId: string) => {
+    // All candidates from Supabase are interactive (no more locked HubSpot candidates)
+    return true;
   };
 
   const handleRecruiterClick = (candidateId: string, candidateName: string) => {
-    // Only allow interaction with test users
-    if (!isTestUser(candidateId)) {
+    // Allow interaction with all candidates from Supabase
+    if (!isInteractiveCandidate(candidateId)) {
       return;
     }
 
@@ -229,28 +241,30 @@ export const CandidatesList = () => {
   };
 
   const handleCallClick = (candidateId: string) => {
-    // Only allow interaction with test users
-    if (!isTestUser(candidateId)) {
+    // Allow interaction with all candidates from Supabase
+    if (!isInteractiveCandidate(candidateId)) {
       return;
     }
 
     const candidate = candidates.find((c) => c.id.toString() === candidateId);
     const assignedJobTitle = candidateJobs[candidateId];
     const assignedRecruiterName = candidateRecruiters[candidateId];
-    
-    if (
-      candidate &&
-      assignedJobTitle &&
-      assignedRecruiterName
-    ) {
+
+    if (candidate && assignedJobTitle && assignedRecruiterName) {
       // Route to appropriate call handler based on assigned recruiter
-      if (assignedRecruiterName === '11Labs Recruiter') {
-        handleStartCall11Labs(candidate.phone, candidate.name, assignedJobTitle);
-      } else if (assignedRecruiterName === 'AI Recruiter Screen IQ') {
+      if (assignedRecruiterName === "11Labs Recruiter") {
+        handleStartCall11Labs(
+          candidate.phone,
+          candidate.name,
+          assignedJobTitle
+        );
+      } else if (assignedRecruiterName === "AI Recruiter Screen IQ") {
         handleStartCall(candidate.phone, candidate.name, assignedJobTitle);
       } else {
         // Default to Bland AI for other recruiters (disabled for now)
-        alert('Call functionality is only available for AI Recruiter Screen IQ and 11Labs Recruiter');
+        alert(
+          "Call functionality is only available for AI Recruiter Screen IQ and 11Labs Recruiter"
+        );
       }
     }
   };
@@ -401,7 +415,7 @@ export const CandidatesList = () => {
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <div className="p-8 text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-            <p className="text-gray-500">Loading candidates from HubSpot...</p>
+            <p className="text-gray-500">Loading candidates from database...</p>
           </div>
         </div>
       </div>
@@ -419,11 +433,10 @@ export const CandidatesList = () => {
           <div className="mt-2 bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded-md">
             <div className="flex items-center justify-between">
               <p className="text-sm">
-                <strong>Note:</strong> {error}. Showing test users and any
-                cached data.
+                <strong>Note:</strong> {error}
               </p>
               <button
-                onClick={refreshCandidates}
+                onClick={handleRefreshCandidates}
                 className="text-sm bg-yellow-600 text-white px-3 py-1 rounded hover:bg-yellow-700 transition-colors"
               >
                 Retry
@@ -466,7 +479,11 @@ export const CandidatesList = () => {
                   <ChevronDownIcon size={16} className="ml-1" />
                 </button>
               </div>
-              <button className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700">
+              <button
+                onClick={handleAddCandidate}
+                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
+              >
+                <PlusIcon size={16} className="mr-2" />
                 Add Candidate
               </button>
             </div>
@@ -619,7 +636,7 @@ export const CandidatesList = () => {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {candidates.map((candidate) => {
-                const isLocked = !isTestUser(candidate.id);
+                const isLocked = !isInteractiveCandidate(candidate.id);
                 return (
                   <tr
                     key={candidate.id}
@@ -644,11 +661,6 @@ export const CandidatesList = () => {
                             }`}
                           >
                             {candidate.name}
-                            {isLocked && (
-                              <span className="ml-2 text-xs text-gray-400">
-                                (HubSpot)
-                              </span>
-                            )}
                           </div>
                           <div className="text-xs text-gray-500">
                             {candidate.email ||
@@ -768,7 +780,7 @@ export const CandidatesList = () => {
                         </span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium relative">
                       {isLocked ? (
                         <div className="flex items-center justify-end space-x-3">
                           <span className="text-gray-400 cursor-not-allowed">
@@ -777,14 +789,56 @@ export const CandidatesList = () => {
                           <LockIcon size={14} className="text-gray-400" />
                         </div>
                       ) : (
-                        <>
+                        <div className="flex items-center justify-end space-x-2">
                           <Link
                             to={`/dashboard/candidates/${candidate.id}`}
-                            className="text-indigo-600 hover:text-indigo-900 mr-3"
+                            className="text-indigo-600 hover:text-indigo-900"
                           >
                             View
                           </Link>
-                        </>
+                          <div className="relative">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleDropdown(candidate.id);
+                              }}
+                              className="p-1 rounded-full hover:bg-gray-100 transition-colors"
+                            >
+                              <MoreVerticalIcon
+                                size={16}
+                                className="text-gray-500"
+                              />
+                            </button>
+
+                            {/* Dropdown menu */}
+                            {activeDropdown === candidate.id && (
+                              <div
+                                className="absolute right-0 top-8 mt-1 w-32 bg-white rounded-md shadow-lg border border-gray-200 py-1 z-20"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <button
+                                  onClick={() => handleEditCandidate(candidate)}
+                                  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                                >
+                                  <EditIcon size={14} className="mr-2" />
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={() =>
+                                    handleDeleteClick(
+                                      candidate.id,
+                                      candidate.name
+                                    )
+                                  }
+                                  className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center"
+                                >
+                                  <TrashIcon size={14} className="mr-2" />
+                                  Delete
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -849,26 +903,37 @@ export const CandidatesList = () => {
                               disabled={
                                 !candidateJobs[candidate.id] ||
                                 !candidateRecruiters[candidate.id] ||
-                                (candidateRecruiters[candidate.id] !== 'AI Recruiter Screen IQ' && 
-                                 candidateRecruiters[candidate.id] !== '11Labs Recruiter')
+                                (candidateRecruiters[candidate.id] !==
+                                  "AI Recruiter Screen IQ" &&
+                                  candidateRecruiters[candidate.id] !==
+                                    "11Labs Recruiter")
                               }
                               className={`inline-flex items-center px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
                                 candidateJobs[candidate.id] &&
                                 candidateRecruiters[candidate.id] &&
-                                (candidateRecruiters[candidate.id] === 'AI Recruiter Screen IQ' || 
-                                 candidateRecruiters[candidate.id] === '11Labs Recruiter')
+                                (candidateRecruiters[candidate.id] ===
+                                  "AI Recruiter Screen IQ" ||
+                                  candidateRecruiters[candidate.id] ===
+                                    "11Labs Recruiter")
                                   ? "bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500"
                                   : "bg-gray-200 text-gray-400 cursor-not-allowed"
                               }`}
-                              title={candidateRecruiters[candidate.id] ? 
-                                `Call via ${candidateRecruiters[candidate.id]}` : 
-                                'Assign a recruiter to enable calling'
+                              title={
+                                candidateRecruiters[candidate.id]
+                                  ? `Call via ${
+                                      candidateRecruiters[candidate.id]
+                                    }`
+                                  : "Assign a recruiter to enable calling"
                               }
                             >
                               <PhoneIcon size={16} className="mr-2" />
-                              {candidateRecruiters[candidate.id] === '11Labs Recruiter' ? 'Call (11Labs)' :
-                               candidateRecruiters[candidate.id] === 'AI Recruiter Screen IQ' ? 'Call (Bland AI)' :
-                               'Call'}
+                              {candidateRecruiters[candidate.id] ===
+                              "11Labs Recruiter"
+                                ? "Call (11Labs)"
+                                : candidateRecruiters[candidate.id] ===
+                                  "AI Recruiter Screen IQ"
+                                ? "Call (Bland AI)"
+                                : "Call"}
                             </button>
                           )}
                         </>
@@ -880,7 +945,7 @@ export const CandidatesList = () => {
             </tbody>
           </table>
         </div>
-        <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+        {/* <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
           <div className="flex-1 flex justify-between sm:hidden">
             <button className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
               Previous
@@ -925,7 +990,7 @@ export const CandidatesList = () => {
               </nav>
             </div>
           </div>
-        </div>
+        </div> */}
       </div>
 
       {/* Job Assignment Modal */}
@@ -944,6 +1009,24 @@ export const CandidatesList = () => {
         candidateId={recruiterAssignmentModal.candidateId}
         candidateName={recruiterAssignmentModal.candidateName}
         currentRecruiterId={recruiterAssignmentModal.currentRecruiterId}
+      />
+
+      {/* Candidate Form Modal */}
+      <CandidateFormModal
+        isOpen={candidateFormModal.isOpen}
+        onClose={handleCloseCandidateModal}
+        candidateToEdit={candidateFormModal.candidateToEdit}
+      />
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmationModal
+        isOpen={deleteModal.isOpen}
+        onClose={handleDeleteCancel}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Candidate"
+        message="Are you sure you want to delete this candidate? All associated data will be permanently removed."
+        itemName={deleteModal.candidateName}
+        isDeleting={isDeletingCandidate}
       />
     </div>
   );

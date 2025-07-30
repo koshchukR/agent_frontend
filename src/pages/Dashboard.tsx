@@ -15,6 +15,7 @@ import { JobPostings } from '../pages/JobPostings';
 import { JobDetails } from '../pages/JobDetails';
 import { JobsProvider } from '../contexts/JobsContext';
 import { RecruitersProvider } from '../contexts/RecruitersContext';
+import { CandidatesProvider } from '../contexts/CandidatesContext';
 
 export const Dashboard = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -22,7 +23,8 @@ export const Dashboard = () => {
   return (
     <JobsProvider>
       <RecruitersProvider>
-      <div className="flex h-screen bg-gray-100">
+        <CandidatesProvider>
+          <div className="flex h-screen bg-gray-100">
         <Sidebar isOpen={sidebarOpen} />
         <div className="flex-1 flex flex-col overflow-hidden">
           <DashboardHeader onMenuToggle={() => setSidebarOpen(!sidebarOpen)} isSidebarOpen={sidebarOpen} />
@@ -41,8 +43,9 @@ export const Dashboard = () => {
               <Route path="/communication" element={<CommunicationCentral />} />
             </Routes>
           </main>
+          </div>
         </div>
-      </div>
+        </CandidatesProvider>
       </RecruitersProvider>
     </JobsProvider>
   );

@@ -1,24 +1,18 @@
-import React, { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { ChevronLeftIcon, UserIcon, BarChart2Icon, MessageSquareIcon, FileTextIcon, GlobeIcon, LinkedinIcon, GithubIcon, TwitterIcon, PaperclipIcon, PhoneIcon, MailIcon, MapPinIcon, CalendarIcon, CheckCircleIcon, XCircleIcon, AlertCircleIcon } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { ChevronLeftIcon, UserIcon, BarChart2Icon, MessageSquareIcon, FileTextIcon, GlobeIcon, LinkedinIcon, GithubIcon, TwitterIcon, PaperclipIcon, PhoneIcon, MailIcon, MapPinIcon, CalendarIcon, CheckCircleIcon, XCircleIcon, AlertCircleIcon, BriefcaseIcon } from 'lucide-react';
+import { useCandidates } from '../../contexts/CandidatesContext';
 export const CandidateDetail = () => {
-  const {
-    id
-  } = useParams();
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { getCandidateById, loading } = useCandidates();
   const [activeTab, setActiveTab] = useState('overview');
-  // Mock data for a candidate
-  const candidate = {
-    id: parseInt(id),
-    name: 'Sarah Johnson',
-    position: 'Senior Developer',
-    status: 'Completed',
-    score: 92,
-    email: 'sarah.johnson@example.com',
-    phone: '+1 (555) 123-4567',
+  
+  const candidate = id ? getCandidateById(id) : null;
+  
+  // Mock additional data that we don't store in database yet
+  const mockAdditionalData = {
     location: 'San Francisco, CA',
-    appliedDate: '2023-06-15',
-    source: 'LinkedIn',
-    botRisk: 'Low',
     skills: ['React', 'TypeScript', 'Node.js', 'GraphQL', 'AWS', 'Docker'],
     education: [{
       degree: 'M.S. Computer Science',
@@ -58,6 +52,58 @@ export const CandidateDetail = () => {
       analysis: 'Shows methodical learning approach and commitment to continuous improvement.'
     }]
   };
+
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="p-6">
+        <div className="animate-pulse">
+          <div className="h-8 bg-gray-200 rounded w-48 mb-6"></div>
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center mb-6">
+              <div className="h-16 w-16 bg-gray-200 rounded-full"></div>
+              <div className="ml-4">
+                <div className="h-6 bg-gray-200 rounded w-32 mb-2"></div>
+                <div className="h-4 bg-gray-200 rounded w-24"></div>
+              </div>
+            </div>
+            <div className="space-y-4">
+              <div className="h-4 bg-gray-200 rounded"></div>
+              <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+              <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show not found state
+  if (!candidate) {
+    return (
+      <div className="p-6">
+        <div className="mb-6">
+          <Link to="/dashboard/candidates" className="inline-flex items-center text-indigo-600 hover:text-indigo-800">
+            <ChevronLeftIcon size={16} className="mr-1" />
+            Back to Candidates
+          </Link>
+        </div>
+        <div className="text-center py-12">
+          <BriefcaseIcon size={48} className="mx-auto text-gray-400 mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Candidate not found</h3>
+          <p className="text-gray-600 mb-4">The candidate you're looking for doesn't exist or has been removed.</p>
+          <Link
+            to="/dashboard/candidates"
+            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
+          >
+            <ChevronLeftIcon size={16} className="mr-2" />
+            Back to Candidates
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return <div>
       <div className="mb-6">
         <Link to="/dashboard/candidates" className="inline-flex items-center text-indigo-600 hover:text-indigo-800">
@@ -81,7 +127,12 @@ export const CandidateDetail = () => {
                     {candidate.position}
                   </span>
                   <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                      ${candidate.status === 'Completed' ? 'bg-green-100 text-green-800' : candidate.status === 'In Progress' ? 'bg-blue-100 text-blue-800' : candidate.status === 'Scheduled' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}`}>
+                      ${candidate.status === 'Hired' ? 'bg-green-100 text-green-800' : 
+                        candidate.status === 'Interview' ? 'bg-blue-100 text-blue-800' : 
+                        candidate.status === 'Scheduled' ? 'bg-yellow-100 text-yellow-800' : 
+                        candidate.status === 'Screening' ? 'bg-purple-100 text-purple-800' :
+                        candidate.status === 'New' ? 'bg-gray-100 text-gray-800' :
+                        'bg-red-100 text-red-800'}`}>
                     {candidate.status}
                   </span>
                 </div>
@@ -109,12 +160,12 @@ export const CandidateDetail = () => {
               </div>
               <div className="flex items-center">
                 <PhoneIcon size={16} className="text-gray-400 mr-2" />
-                <span className="text-sm text-gray-600">{candidate.phone}</span>
+                <span className="text-sm text-gray-600">{candidate.phone || 'Not provided'}</span>
               </div>
               <div className="flex items-center">
                 <MapPinIcon size={16} className="text-gray-400 mr-2" />
                 <span className="text-sm text-gray-600">
-                  {candidate.location}
+                  {mockAdditionalData.location}
                 </span>
               </div>
               <div className="flex items-center">
@@ -161,7 +212,7 @@ export const CandidateDetail = () => {
                   <h2 className="text-lg font-medium mb-4">AI Insights</h2>
                   <div className="bg-indigo-50 rounded-lg p-4 border border-indigo-100">
                     <ul className="space-y-2">
-                      {candidate.aiInsights.map((insight, index) => <li key={index} className="flex items-start">
+                      {mockAdditionalData.aiInsights.map((insight, index) => <li key={index} className="flex items-start">
                           <span className="h-5 w-5 flex-shrink-0 flex items-center justify-center rounded-full bg-indigo-100 text-indigo-600 mr-2 mt-0.5">
                             ✓
                           </span>
@@ -173,7 +224,7 @@ export const CandidateDetail = () => {
                 <div>
                   <h2 className="text-lg font-medium mb-4">Experience</h2>
                   <div className="space-y-4">
-                    {candidate.experience.map((exp, index) => <div key={index} className="border border-gray-200 rounded-lg p-4">
+                    {mockAdditionalData.experience.map((exp, index) => <div key={index} className="border border-gray-200 rounded-lg p-4">
                         <div className="flex justify-between">
                           <div>
                             <h3 className="font-medium">{exp.title}</h3>
@@ -194,7 +245,7 @@ export const CandidateDetail = () => {
                 <div>
                   <h2 className="text-lg font-medium mb-4">Education</h2>
                   <div className="space-y-4">
-                    {candidate.education.map((edu, index) => <div key={index} className="border border-gray-200 rounded-lg p-4">
+                    {mockAdditionalData.education.map((edu, index) => <div key={index} className="border border-gray-200 rounded-lg p-4">
                         <div className="flex justify-between">
                           <div>
                             <h3 className="font-medium">{edu.degree}</h3>
@@ -217,11 +268,11 @@ export const CandidateDetail = () => {
                     <div className="flex items-center justify-between mb-4">
                       <span className="text-gray-600">Overall Score</span>
                       <span className="text-2xl font-bold text-indigo-600">
-                        {candidate.score}/100
+                        {candidate.score || 0}/100
                       </span>
                     </div>
                     <div className="space-y-4">
-                      {Object.entries(candidate.screeningResults).map(([key, value]) => <div key={key}>
+                      {Object.entries(mockAdditionalData.screeningResults).map(([key, value]) => <div key={key}>
                             <div className="flex justify-between mb-1">
                               <span className="text-sm capitalize">
                                 {key.replace(/([A-Z])/g, ' $1')}
@@ -243,7 +294,7 @@ export const CandidateDetail = () => {
                   <h2 className="text-lg font-medium mb-4">Skills</h2>
                   <div className="bg-white border border-gray-200 rounded-lg p-4">
                     <div className="flex flex-wrap gap-2">
-                      {candidate.skills.map((skill, index) => <span key={index} className="px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-sm">
+                      {mockAdditionalData.skills.map((skill, index) => <span key={index} className="px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-sm">
                           {skill}
                         </span>)}
                     </div>
@@ -262,7 +313,7 @@ export const CandidateDetail = () => {
                       <div className="flex justify-between">
                         <span className="text-gray-600">Application Date</span>
                         <span className="font-medium">
-                          {new Date(candidate.appliedDate).toLocaleDateString()}
+                          {new Date(candidate.date).toLocaleDateString()}
                         </span>
                       </div>
                       <div className="pt-3 border-t border-gray-100">
@@ -415,7 +466,7 @@ export const CandidateDetail = () => {
                   </div>
                 </div>
                 <div className="space-y-6">
-                  {candidate.conversationHighlights.map((highlight, index) => <div key={index} className="space-y-3">
+                  {mockAdditionalData.conversationHighlights.map((highlight, index) => <div key={index} className="space-y-3">
                       <div className="flex items-start">
                         <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 mr-3 mt-1">
                           AI
@@ -444,10 +495,22 @@ export const CandidateDetail = () => {
           {activeTab === 'resume' && <div>
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-medium">Resume</h2>
-                <button className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-md bg-white text-sm font-medium text-gray-700 hover:bg-gray-50">
-                  <PaperclipIcon size={16} className="mr-1" />
-                  Download Resume
-                </button>
+                {candidate.resume_url ? (
+                  <a
+                    href={candidate.resume_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-md bg-white text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  >
+                    <PaperclipIcon size={16} className="mr-1" />
+                    Download Resume
+                  </a>
+                ) : (
+                  <span className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-md bg-gray-100 text-sm font-medium text-gray-400 cursor-not-allowed">
+                    <PaperclipIcon size={16} className="mr-1" />
+                    No Resume
+                  </span>
+                )}
               </div>
               <div className="bg-white border border-gray-200 rounded-lg p-6">
                 <div className="border-b border-gray-100 pb-4 mb-4">
@@ -462,11 +525,11 @@ export const CandidateDetail = () => {
                     </div>
                     <div className="flex items-center">
                       <PhoneIcon size={14} className="mr-1" />
-                      {candidate.phone}
+                      {candidate.phone || 'Not provided'}
                     </div>
                     <div className="flex items-center">
                       <MapPinIcon size={14} className="mr-1" />
-                      {candidate.location}
+                      {mockAdditionalData.location}
                     </div>
                   </div>
                 </div>
