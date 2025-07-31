@@ -79,8 +79,14 @@ export const CandidatesList = () => {
     candidateName: "",
   });
 
-  const [isCalling, setIsCalling] = useState(false);
-  const [activeCallId, setActiveCallId] = useState<string | null>(null);
+  const [isProcessingWorkflow, setIsProcessingWorkflow] = useState(false);
+  const [activeWorkflowId, setActiveWorkflowId] = useState<string | null>(null);
+  const [workflowNotification, setWorkflowNotification] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type: "success" | "error";
+  }>({ isOpen: false, title: "", message: "", type: "success" });
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -240,7 +246,7 @@ export const CandidatesList = () => {
     });
   };
 
-  const handleCallClick = (candidateId: string) => {
+  const handleWorkflowClick = async (candidateId: string) => {
     // Allow interaction with all candidates from Supabase
     if (!isInteractiveCandidate(candidateId)) {
       return;
@@ -251,92 +257,34 @@ export const CandidatesList = () => {
     const assignedRecruiterName = candidateRecruiters[candidateId];
 
     if (candidate && assignedJobTitle && assignedRecruiterName) {
-      // Route to appropriate call handler based on assigned recruiter
-      if (assignedRecruiterName === "11Labs Recruiter") {
-        handleStartCall11Labs(
-          candidate.phone,
-          candidate.name,
-          assignedJobTitle
-        );
-      } else if (assignedRecruiterName === "AI Recruiter Screen IQ") {
-        handleStartCall(candidate.phone, candidate.name, assignedJobTitle);
-      } else {
-        // Default to Bland AI for other recruiters (disabled for now)
-        alert(
-          "Call functionality is only available for AI Recruiter Screen IQ and 11Labs Recruiter"
-        );
-      }
-    }
-  };
-
-  // Bland AI call function (for AI Recruiter Screen IQ)
-  const handleStartCall = async (
-    phone: string,
-    name: string,
-    position: string
-  ): Promise<void> => {
-    try {
-      setIsCalling(true);
-      setActiveCallId(phone);
-
-      const res = await fetch(
-        "https://recruiter-agent-backend-sznn.onrender.com/start-call",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            phone,
-            name,
-            position,
-          }),
-        }
+      await handleStartWorkflow(
+        candidate.name,
+        candidate.phone,
+        assignedJobTitle
       );
-
-      const data = await res.json();
-
-      if (res.ok) {
-        console.log("Bland AI call started:", data);
-        alert(`Call initiated to ${phone} via AI Recruiter Screen IQ`);
-      } else {
-        console.error("Bland AI call error:", data);
-        alert("Call failed: " + (data.error || "Unknown error"));
-      }
-    } catch (err: unknown) {
-      if (err instanceof Error) {
-        console.error("Network error:", err.message);
-        alert("Network error: " + err.message);
-      } else {
-        console.error("Unknown error:", err);
-        alert("Unknown error occurred");
-      }
-    } finally {
-      setIsCalling(false);
-      setActiveCallId(null);
     }
   };
 
-  // 11Labs call function (for 11Labs Recruiter)
-  const handleStartCall11Labs = async (
+  // SMS Workflow function
+  const handleStartWorkflow = async (
+    name: string,
     phone: string,
-    candidate_name: string,
     job_title: string
   ): Promise<void> => {
     try {
-      setIsCalling(true);
-      setActiveCallId(phone);
+      setIsProcessingWorkflow(true);
+      setActiveWorkflowId(phone);
 
       const res = await fetch(
-        "https://recruiter-agent-backend-sznn.onrender.com/elevenlabs/call",
+        "https://recruiter-agent-backend-sznn.onrender.com/send-sms",
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
+            name,
             phone,
-            candidate_name,
             job_title,
           }),
         }
@@ -345,23 +293,37 @@ export const CandidatesList = () => {
       const data = await res.json();
 
       if (res.ok) {
-        console.log("11Labs call started:", data);
-        alert(`Call initiated to ${phone} via 11Labs Recruiter`);
+        console.log("SMS workflow started successfully:", data);
+        setWorkflowNotification({
+          isOpen: true,
+          title: "Workflow Started Successfully",
+          message: `SMS workflow has been initiated for ${name} (${phone}) for the ${job_title} position.`,
+          type: "success",
+        });
       } else {
-        console.error("11Labs call error:", data);
-        alert("Call failed: " + (data.error || "Unknown error"));
+        console.error("SMS workflow error:", data);
+        setWorkflowNotification({
+          isOpen: true,
+          title: "Workflow Failed",
+          message: `Failed to start SMS workflow: ${
+            data.error || "Unknown error occurred"
+          }`,
+          type: "error",
+        });
       }
     } catch (err: unknown) {
-      if (err instanceof Error) {
-        console.error("Network error:", err.message);
-        alert("Network error: " + err.message);
-      } else {
-        console.error("Unknown error:", err);
-        alert("Unknown error occurred");
-      }
+      console.error("Network error:", err);
+      const errorMessage =
+        err instanceof Error ? err.message : "Network connection failed";
+      setWorkflowNotification({
+        isOpen: true,
+        title: "Network Error",
+        message: `Unable to start workflow: ${errorMessage}`,
+        type: "error",
+      });
     } finally {
-      setIsCalling(false);
-      setActiveCallId(null);
+      setIsProcessingWorkflow(false);
+      setActiveWorkflowId(null);
     }
   };
 
@@ -627,7 +589,7 @@ export const CandidatesList = () => {
                   AI Agent
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Call
+                  Workflow
                 </th>
               </tr>
             </thead>
@@ -848,52 +810,38 @@ export const CandidatesList = () => {
                         </div>
                       ) : (
                         <>
-                          {isCalling && activeCallId === candidate.phone ? (
+                          {isProcessingWorkflow &&
+                          activeWorkflowId === candidate.phone ? (
                             <div className="flex items-center justify-center bg-blue-50 border border-blue-200 rounded-md px-3 py-2">
                               <div className="flex items-center space-x-2">
                                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
                                 <span className="text-sm font-medium text-blue-600">
-                                  Calling...
+                                  Processing...
                                 </span>
                               </div>
                             </div>
                           ) : (
                             <button
-                              onClick={() => handleCallClick(candidate.id)}
+                              onClick={() => handleWorkflowClick(candidate.id)}
                               disabled={
                                 !candidateJobs[candidate.id] ||
-                                !candidateRecruiters[candidate.id] ||
-                                (candidateRecruiters[candidate.id] !==
-                                  "AI Recruiter Screen IQ" &&
-                                  candidateRecruiters[candidate.id] !==
-                                    "11Labs Recruiter")
+                                !candidateRecruiters[candidate.id]
                               }
                               className={`inline-flex items-center px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
                                 candidateJobs[candidate.id] &&
-                                candidateRecruiters[candidate.id] &&
-                                (candidateRecruiters[candidate.id] ===
-                                  "AI Recruiter Screen IQ" ||
-                                  candidateRecruiters[candidate.id] ===
-                                    "11Labs Recruiter")
+                                candidateRecruiters[candidate.id]
                                   ? "bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500"
                                   : "bg-gray-200 text-gray-400 cursor-not-allowed"
                               }`}
                               title={
+                                candidateJobs[candidate.id] &&
                                 candidateRecruiters[candidate.id]
-                                  ? `Call via ${
-                                      candidateRecruiters[candidate.id]
-                                    }`
-                                  : "Assign a recruiter to enable calling"
+                                  ? "Start SMS workflow for this candidate"
+                                  : "Assign a job and recruiter to enable workflow"
                               }
                             >
                               <PhoneIcon size={16} className="mr-2" />
-                              {candidateRecruiters[candidate.id] ===
-                              "11Labs Recruiter"
-                                ? "Call (11Labs)"
-                                : candidateRecruiters[candidate.id] ===
-                                  "AI Recruiter Screen IQ"
-                                ? "Call (Bland AI)"
-                                : "Call"}
+                              Start workflow
                             </button>
                           )}
                         </>
@@ -988,6 +936,58 @@ export const CandidatesList = () => {
         itemName={deleteModal.candidateName}
         isDeleting={isDeletingCandidate}
       />
+
+      {/* Workflow Notification Modal */}
+      {workflowNotification.isOpen && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" />
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div className="sm:flex sm:items-start">
+                  <div
+                    className={`mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full sm:mx-0 sm:h-10 sm:w-10 ${
+                      workflowNotification.type === "success"
+                        ? "bg-green-100"
+                        : "bg-red-100"
+                    }`}
+                  >
+                    {workflowNotification.type === "success" ? (
+                      <CheckCircleIcon className="h-6 w-6 text-green-600" />
+                    ) : (
+                      <XCircleIcon className="h-6 w-6 text-red-600" />
+                    )}
+                  </div>
+                  <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                    <h3 className="text-lg leading-6 font-medium text-gray-900">
+                      {workflowNotification.title}
+                    </h3>
+                    <div className="mt-2">
+                      <p className="text-sm text-gray-500">
+                        {workflowNotification.message}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setWorkflowNotification({
+                      ...workflowNotification,
+                      isOpen: false,
+                    })
+                  }
+                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:ml-3 sm:w-auto sm:text-sm"
+                >
+                  OK
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
