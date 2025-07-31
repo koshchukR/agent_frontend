@@ -9,6 +9,8 @@ import { Footer } from './components/Footer';
 import { Dashboard } from './pages/Dashboard';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
+import { Calendar } from './pages/Calendar';
+import { CalendarTest } from './pages/CalendarTest';
 import { AuthProvider } from './contexts/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
@@ -20,6 +22,8 @@ export function App() {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/calendar" element={<Calendar />} />
+            <Route path="/calendar-test" element={<CalendarTest />} />
             <Route 
               path="/dashboard/*" 
               element={

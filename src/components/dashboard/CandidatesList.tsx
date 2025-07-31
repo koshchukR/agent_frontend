@@ -10,6 +10,7 @@ import {
   useCandidates,
   type Candidate,
 } from "../../contexts/CandidatesContext";
+import { useAuth } from "../../contexts/AuthContext";
 import {
   SearchIcon,
   FilterIcon,
@@ -35,6 +36,7 @@ export const CandidatesList = () => {
   const { recruiters } = useRecruiters();
   const { candidates, loading, error, refreshCandidates, deleteCandidate } =
     useCandidates();
+  const { user } = useAuth();
   const [sortField, setSortField] = useState("name");
   const [sortDirection, setSortDirection] = useState("asc");
   const [filterOpen, setFilterOpen] = useState(false);
@@ -260,7 +262,9 @@ export const CandidatesList = () => {
       await handleStartWorkflow(
         candidate.name,
         candidate.phone,
-        assignedJobTitle
+        assignedJobTitle,
+        candidateId,
+        user?.id || ''
       );
     }
   };
@@ -269,7 +273,9 @@ export const CandidatesList = () => {
   const handleStartWorkflow = async (
     name: string,
     phone: string,
-    job_title: string
+    job_title: string,
+    candidate_id: string,
+    user_id: string
   ): Promise<void> => {
     try {
       setIsProcessingWorkflow(true);
@@ -286,6 +292,8 @@ export const CandidatesList = () => {
             name,
             phone,
             job_title,
+            candidate_id,
+            user_id,
           }),
         }
       );
