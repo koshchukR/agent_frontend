@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
-import { XIcon, SearchIcon, BriefcaseIcon, BuildingIcon, MapPinIcon } from 'lucide-react'
+import { XIcon, SearchIcon, BriefcaseIcon, BuildingIcon, MapPinIcon, PlusIcon } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { useJobs, type JobPosting } from '../contexts/JobsContext'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -21,6 +22,7 @@ export const JobAssignmentModal: React.FC<JobAssignmentModalProps> = ({
 }) => {
   const { jobs, loading } = useJobs()
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedJobId, setSelectedJobId] = useState('')
   const [isAssigning, setIsAssigning] = useState(false)
@@ -115,6 +117,11 @@ export const JobAssignmentModal: React.FC<JobAssignmentModalProps> = ({
     }
   }
 
+  const handleCreateJob = () => {
+    onClose()
+    navigate('/dashboard/jobs')
+  }
+
   const selectedJob = jobs.find(job => job.id === selectedJobId)
 
   return (
@@ -193,7 +200,15 @@ export const JobAssignmentModal: React.FC<JobAssignmentModalProps> = ({
               ) : filteredJobs.length === 0 ? (
                 <div className="p-4 text-center text-gray-500">
                   <BriefcaseIcon size={24} className="mx-auto mb-2 text-gray-400" />
-                  No active jobs found
+                  <p className="mb-3">No active jobs found</p>
+                  <button
+                    type="button"
+                    onClick={handleCreateJob}
+                    className="inline-flex items-center px-4 py-2 border border-blue-300 rounded-md shadow-sm text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  >
+                    <PlusIcon size={16} className="mr-2" />
+                    Create Job
+                  </button>
                 </div>
               ) : (
                 <div className="divide-y divide-gray-200">

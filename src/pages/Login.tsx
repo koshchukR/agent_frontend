@@ -11,7 +11,7 @@ export const Login: React.FC = () => {
   const navigate = useNavigate()
   const location = useLocation()
 
-  const from = location.state?.from?.pathname || '/dashboard'
+  const from = location.state?.from?.pathname || '/dashboard/candidates'
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

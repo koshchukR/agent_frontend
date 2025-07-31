@@ -619,9 +619,6 @@ export const CandidatesList = () => {
                       ))}
                   </div>
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Bot Risk
-                </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
                 </th>
@@ -742,44 +739,7 @@ export const CandidatesList = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {new Date(candidate.date).toLocaleDateString()}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        {candidate.botRisk === "Low" && (
-                          <CheckCircleIcon
-                            size={16}
-                            className="text-green-500 mr-1"
-                          />
-                        )}
-                        {candidate.botRisk === "Medium" && (
-                          <AlertCircleIcon
-                            size={16}
-                            className="text-yellow-500 mr-1"
-                          />
-                        )}
-                        {candidate.botRisk === "High" && (
-                          <XCircleIcon
-                            size={16}
-                            className="text-red-500 mr-1"
-                          />
-                        )}
-                        {candidate.botRisk === "Unknown" && (
-                          <ClockIcon size={16} className="text-gray-400 mr-1" />
-                        )}
-                        <span
-                          className={`text-sm ${
-                            candidate.botRisk === "Low"
-                              ? "text-green-600"
-                              : candidate.botRisk === "Medium"
-                              ? "text-yellow-600"
-                              : candidate.botRisk === "High"
-                              ? "text-red-600"
-                              : "text-gray-500"
-                          }`}
-                        >
-                          {candidate.botRisk}
-                        </span>
-                      </div>
-                    </td>
+
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium relative">
                       {isLocked ? (
                         <div className="flex items-center justify-end space-x-3">

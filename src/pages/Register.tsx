@@ -41,7 +41,7 @@ export const Register: React.FC = () => {
     } else {
       setSuccess(true)
       setTimeout(() => {
-        navigate('/dashboard')
+        navigate('/dashboard/candidates')
       }, 2000)
     }
     
