@@ -93,6 +93,9 @@ export const Calendar: React.FC = () => {
 
   // Check if we have required parameters and they're valid UUIDs
   const hasRequiredParams = candidateId && userId && isValidUUID(candidateId) && isValidUUID(userId);
+  
+  // Add state to track if we're having database access issues
+  const [databaseAccessIssue, setDatabaseAccessIssue] = useState(false);
 
   // Debug the parameters
   console.log("Parameters check:", {
@@ -109,12 +112,14 @@ export const Calendar: React.FC = () => {
   }
 
   useEffect(() => {
+    console.log("Calendar useEffect triggered", { candidateId, userId, hasRequiredParams });
+    
     if (hasRequiredParams) {
       fetchExistingBookings();
       fetchCandidateInfo();
       fetchAssignedJobTitle();
     }
-  }, [candidateId, userId]);
+  }, [candidateId, userId, hasRequiredParams]);
 
   useEffect(() => {
     generateAvailableSlots();
@@ -125,6 +130,10 @@ export const Calendar: React.FC = () => {
 
     try {
       setLoading(true);
+      console.log("Fetching existing bookings for userId:", userId);
+      
+      // For public calendar access, we need to ensure this query works without authentication
+      // The RLS policy should allow reading screenings for the specific user_id
       const { data, error } = await supabase
         .from("candidate_screenings")
         .select("*")
@@ -132,14 +141,59 @@ export const Calendar: React.FC = () => {
         .eq("status", "scheduled")
         .gte("datetime", new Date().toISOString());
 
+      console.log("Existing bookings result:", { data, error });
+
       if (error) {
         console.error("Error fetching bookings:", error);
+        console.error("Bookings error details:", {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        });
+        
+        // If RLS prevents access, try backend API fallback
+        if (error.code === 'PGRST301' || error.message?.includes('RLS') || error.message?.includes('permission denied')) {
+          console.warn("RLS preventing bookings fetch, trying backend API fallback");
+          
+          try {
+            const backendUrl = import.meta.env.VITE_BACKEND_API_URL;
+            if (backendUrl) {
+              console.log("Attempting backend API fallback for availability");
+              const response = await fetch(`${backendUrl}/calendar/availability/${userId}`);
+              
+              if (response.ok) {
+                const availabilityData = await response.json();
+                console.log("Successfully fetched availability from backend:", availabilityData);
+                // Convert backend format to expected format
+                const formattedBookings = availabilityData.map((item: any) => ({
+                  id: `backend-${Date.now()}-${Math.random()}`,
+                  candidate_id: '',
+                  user_id: userId,
+                  datetime: item.datetime,
+                  status: 'scheduled'
+                }));
+                setExistingBookings(formattedBookings);
+                return;
+              } else {
+                console.log("Backend availability API failed:", response.status);
+              }
+            }
+          } catch (backendError) {
+            console.error("Backend availability API fallback failed:", backendError);
+          }
+          
+          console.warn("Continuing with empty bookings list");
+          setExistingBookings([]);
+        }
         return;
       }
 
       setExistingBookings(data || []);
     } catch (error) {
       console.error("Error fetching bookings:", error);
+      // Continue with empty bookings list to allow booking to proceed
+      setExistingBookings([]);
     } finally {
       setLoading(false);
     }
@@ -149,30 +203,101 @@ export const Calendar: React.FC = () => {
     if (!candidateId) return;
 
     try {
+      console.log("Fetching candidate info for ID:", candidateId);
+      console.log("Candidate ID length:", candidateId?.length);
+      console.log("Candidate ID type:", typeof candidateId);
+      
+      // First try direct Supabase query
       const { data, error } = await supabase
         .from("candidates")
         .select("name, phone, position")
         .eq("id", candidateId)
-        .single();
+        .limit(1);
+
+      console.log("Candidate fetch result:", { data, error });
 
       if (error) {
         console.error("Error fetching candidate info:", error);
+        console.error("Error details:", {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        });
         
-        // Handle specific case where candidate doesn't exist
-        if (error.code === 'PGRST116') {
+        // Handle specific error cases
+        if (error.code === 'PGRST116' || error.message?.includes('no rows')) {
           setNotification({
             show: true,
             type: "error",
             title: "Invalid Booking Link",
             message: "The candidate information could not be found. This booking link may be invalid or expired. Please contact the person who sent you this link.",
           });
+        } else if (error.code === 'PGRST301' || error.message?.includes('RLS') || error.message?.includes('permission denied')) {
+          console.warn("RLS policy preventing candidate info access, trying backend API fallback");
+          
+          // Try secure backend API fallback with user validation
+          try {
+            const backendUrl = import.meta.env.VITE_BACKEND_API_URL;
+            if (backendUrl) {
+              console.log("Attempting secure backend API fallback for candidate info");
+              const response = await fetch(`${backendUrl}/calendar/candidate-info/${candidateId}/${userId}`);
+              
+              if (response.ok) {
+                const candidateData = await response.json();
+                console.log("Successfully fetched candidate info from backend:", candidateData);
+                setCandidateInfo(candidateData);
+                return;
+              } else {
+                console.log("Backend API also failed:", response.status);
+                const errorData = await response.json().catch(() => ({}));
+                console.log("Backend error details:", errorData);
+              }
+            }
+          } catch (backendError) {
+            console.error("Backend API fallback failed:", backendError);
+          }
+          
+          setDatabaseAccessIssue(true);
+          setNotification({
+            show: true,
+            type: "error",
+            title: "Authentication Required for Calendar Access",
+            message: "The booking system is currently configured to require authentication. Please contact the administrator to enable public calendar bookings, or ask the person who sent you this link to ensure you can access it while they are logged in.",
+          });
+        } else {
+          setNotification({
+            show: true,
+            type: "error",
+            title: "Database Error",
+            message: `Unable to fetch candidate information: ${error.message}`,
+          });
         }
         return;
       }
 
-      setCandidateInfo(data);
+      if (!data || data.length === 0) {
+        console.log("No candidate found with ID:", candidateId);
+        setNotification({
+          show: true,
+          type: "error",
+          title: "Candidate Not Found",
+          message: "No candidate was found with the provided ID. This booking link may be invalid or expired.",
+        });
+        return;
+      }
+
+      const candidateData = data[0]; // Get first (and only) result
+      console.log("Successfully fetched candidate info:", candidateData);
+      setCandidateInfo(candidateData);
     } catch (error) {
       console.error("Error fetching candidate info:", error);
+      setNotification({
+        show: true,
+        type: "error",
+        title: "Network Error",
+        message: "Failed to connect to the database. Please check your internet connection and try again.",
+      });
     }
   };
 
@@ -180,6 +305,8 @@ export const Calendar: React.FC = () => {
     if (!candidateId) return;
 
     try {
+      console.log("Fetching assigned job title for candidate ID:", candidateId);
+      
       const { data, error } = await supabase
         .from("candidate_job_assignments")
         .select(
@@ -188,15 +315,28 @@ export const Calendar: React.FC = () => {
         `
         )
         .eq("candidate_id", candidateId)
-        .single();
+        .limit(1);
+
+      console.log("Job assignment fetch result:", { data, error });
 
       if (error) {
         console.error("Error fetching assigned job:", error);
+        console.error("Job assignment error details:", {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        });
+        // Don't show error notification for job assignment failures
+        // as this is optional information
         return;
       }
 
-      if (data?.job_postings?.title) {
-        setAssignedJobTitle(data.job_postings.title);
+      if (data && data.length > 0 && data[0]?.job_postings?.title) {
+        console.log("Found assigned job title:", data[0].job_postings.title);
+        setAssignedJobTitle(data[0].job_postings.title);
+      } else {
+        console.log("No job assignment found for candidate");
       }
     } catch (error) {
       console.error("Error fetching assigned job:", error);
@@ -373,7 +513,14 @@ export const Calendar: React.FC = () => {
         timestamp: new Date(datetime).getTime(),
       });
 
-      const { error } = await supabase
+      console.log("Attempting to insert booking:", {
+        candidate_id: candidateId,
+        user_id: userId,
+        datetime: datetime,
+        status: "scheduled",
+      });
+
+      const { data: insertData, error } = await supabase
         .from("candidate_screenings")
         .insert([
           {
@@ -383,16 +530,90 @@ export const Calendar: React.FC = () => {
             status: "scheduled",
           },
         ])
-        .select()
-        .single();
+        .select();
+
+      console.log("Booking insertion result:", { insertData, error });
 
       if (error) {
         console.error("Booking error:", error);
+        console.error("Booking error details:", {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        });
+        
+        let errorMessage = `Failed to book your appointment: ${error.message}`;
+        
+        // Provide more helpful error messages based on the error type
+        if (error.code === 'PGRST301' || error.message?.includes('RLS') || error.message?.includes('permission denied')) {
+          console.warn("RLS policy preventing booking creation, trying backend API fallback");
+          
+          // Try secure backend API fallback for booking creation
+          try {
+            const backendUrl = import.meta.env.VITE_BACKEND_API_URL;
+            if (backendUrl) {
+              console.log("Attempting secure backend API fallback for booking creation");
+              const response = await fetch(`${backendUrl}/calendar/create-booking`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  candidate_id: candidateId,
+                  user_id: userId,
+                  datetime: datetime,
+                  status: "scheduled",
+                }),
+              });
+              
+              if (response.ok) {
+                const bookingResult = await response.json();
+                console.log("Successfully created booking via backend:", bookingResult);
+                
+                // Continue with SMS sending and success notification
+                const jobTitle = assignedJobTitle || candidateInfo.position;
+                await sendConfirmationSMS(
+                  candidateInfo.name,
+                  candidateInfo.phone,
+                  jobTitle,
+                  selectedDateStr,
+                  selectedTime
+                );
+
+                setNotification({
+                  show: true,
+                  type: "success",
+                  title: "Booking Confirmed!",
+                  message: `Your screening appointment has been scheduled for ${new Date(
+                    datetime
+                  ).toLocaleDateString()} at ${selectedTime}. A confirmation SMS has been sent to your phone.`,
+                });
+
+                // Refresh bookings and reset selection
+                await fetchExistingBookings();
+                setSelectedDate(null);
+                setSelectedTime("");
+                return;
+              } else {
+                console.log("Backend API booking also failed:", response.status);
+              }
+            }
+          } catch (backendError) {
+            console.error("Backend API booking fallback failed:", backendError);
+          }
+          
+          setDatabaseAccessIssue(true);
+          errorMessage = "Unable to create booking due to database security restrictions. The database needs to be configured to allow public calendar bookings. Please contact the administrator.";
+        } else if (error.code === '23505') {
+          errorMessage = "This time slot may already be booked. Please select a different time.";
+        }
+        
         setNotification({
           show: true,
           type: "error",
           title: "Booking Failed",
-          message: `Failed to book your appointment: ${error.message}`,
+          message: errorMessage,
         });
         return;
       }
@@ -502,6 +723,33 @@ export const Calendar: React.FC = () => {
             Select an available date and time for your screening appointment
           </p>
         </div>
+
+        {/* Database Access Issue Banner */}
+        {databaseAccessIssue && (
+          <div className="mb-6 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <XCircleIcon className="h-5 w-5 text-yellow-400" />
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-yellow-800">
+                  Database Configuration Required
+                </h3>
+                <div className="mt-2 text-sm text-yellow-700">
+                  <p>
+                    The calendar booking system requires database Row Level Security (RLS) policies to be configured for public access. 
+                    The administrator needs to allow:
+                  </p>
+                  <ul className="mt-2 ml-4 list-disc">
+                    <li>Public read access to candidates table</li>
+                    <li>Public read access to candidate_screenings table</li>
+                    <li>Public insert access to candidate_screenings table</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Calendar */}
