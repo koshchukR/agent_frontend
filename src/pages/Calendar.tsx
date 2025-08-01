@@ -29,12 +29,19 @@ interface Booking {
 
 export const Calendar: React.FC = () => {
   const [searchParams] = useSearchParams();
-  // Clean and fix the UUIDs (remove spaces and decode URL encoding)
+  // Clean and fix the UUIDs (remove spaces, decode URL encoding, and handle malformed URLs)
   const rawCandidateId = searchParams.get("candidate_id");
   const rawUserId = searchParams.get("user_id");
 
-  const candidateId = rawCandidateId?.replace(/\s+/g, "")?.trim();
-  const userId = rawUserId?.replace(/\s+/g, "")?.trim();
+  const candidateId = rawCandidateId
+    ?.replace(/\s+/g, "") // Remove all spaces
+    ?.replace(/%20/g, "") // Remove URL-encoded spaces
+    ?.trim();
+  
+  const userId = rawUserId
+    ?.replace(/\s+/g, "") // Remove all spaces
+    ?.replace(/%20/g, "") // Remove URL-encoded spaces
+    ?.trim();
 
   // Debug logging
   console.log("Calendar Debug Info:", {
@@ -77,8 +84,15 @@ export const Calendar: React.FC = () => {
     "17:00",
   ];
 
-  // Check if we have required parameters
-  const hasRequiredParams = candidateId && userId;
+  // UUID format validation
+  const isValidUUID = (uuid: string | null | undefined): boolean => {
+    if (!uuid) return false;
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(uuid);
+  };
+
+  // Check if we have required parameters and they're valid UUIDs
+  const hasRequiredParams = candidateId && userId && isValidUUID(candidateId) && isValidUUID(userId);
 
   // Debug the parameters
   console.log("Parameters check:", {
@@ -143,6 +157,16 @@ export const Calendar: React.FC = () => {
 
       if (error) {
         console.error("Error fetching candidate info:", error);
+        
+        // Handle specific case where candidate doesn't exist
+        if (error.code === 'PGRST116') {
+          setNotification({
+            show: true,
+            type: "error",
+            title: "Invalid Booking Link",
+            message: "The candidate information could not be found. This booking link may be invalid or expired. Please contact the person who sent you this link.",
+          });
+        }
         return;
       }
 
@@ -331,8 +355,8 @@ export const Calendar: React.FC = () => {
       setNotification({
         show: true,
         type: "error",
-        title: "Missing Candidate Information",
-        message: "Unable to retrieve candidate information. Please try again.",
+        title: "Candidate Information Unavailable",
+        message: "The candidate information could not be loaded. This may indicate an issue with the booking link. Please refresh the page or contact support if the problem persists.",
       });
       return;
     }
@@ -427,19 +451,36 @@ export const Calendar: React.FC = () => {
   };
 
   if (!hasRequiredParams) {
+    const errorMessage = "This booking link is missing required information.";
+    let errorDetails = "";
+
+    if (!candidateId && !userId) {
+      errorDetails = "Both candidate ID and user ID are missing.";
+    } else if (!candidateId) {
+      errorDetails = "Candidate ID is missing.";
+    } else if (!userId) {
+      errorDetails = "User ID is missing.";
+    } else if (!isValidUUID(candidateId)) {
+      errorDetails = "Candidate ID format is invalid.";
+    } else if (!isValidUUID(userId)) {
+      errorDetails = "User ID format is invalid.";
+    }
+
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-6 text-center">
           <XCircleIcon className="mx-auto h-12 w-12 text-red-500 mb-4" />
           <h1 className="text-2xl font-bold text-gray-900 mb-2">
-            Invalid Link
+            Invalid Booking Link
           </h1>
           <p className="text-gray-600 mb-4">
-            This booking link is missing required information. Please check with
-            the person who sent you this link.
+            {errorMessage}
           </p>
-          <p className="text-sm text-gray-500">
-            Required parameters: candidate_id and user_id
+          <p className="text-sm text-gray-500 mb-4">
+            {errorDetails}
+          </p>
+          <p className="text-sm text-gray-400">
+            Please contact the person who sent you this link for assistance.
           </p>
         </div>
       </div>
