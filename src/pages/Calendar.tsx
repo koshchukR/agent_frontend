@@ -49,6 +49,11 @@ export const Calendar: React.FC = () => {
     title: string;
     message: string;
   }>({ show: false, type: 'success', title: '', message: '' });
+  const [candidateInfo, setCandidateInfo] = useState<{
+    name: string;
+    phone: string;
+    position: string;
+  } | null>(null);
 
   // Available time slots (9 AM to 5 PM, every hour)
   const timeSlots = [
@@ -75,6 +80,7 @@ export const Calendar: React.FC = () => {
   useEffect(() => {
     if (hasRequiredParams) {
       fetchExistingBookings();
+      fetchCandidateInfo();
     }
   }, [candidateId, userId]);
 
@@ -107,35 +113,64 @@ export const Calendar: React.FC = () => {
     }
   };
 
+  const fetchCandidateInfo = async () => {
+    if (!candidateId) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('candidates')
+        .select('name, phone, position')
+        .eq('id', candidateId)
+        .single();
+
+      if (error) {
+        console.error('Error fetching candidate info:', error);
+        return;
+      }
+
+      setCandidateInfo(data);
+    } catch (error) {
+      console.error('Error fetching candidate info:', error);
+    }
+  };
+
   const generateAvailableSlots = () => {
     const slots: BookingSlot[] = [];
     const today = new Date();
+    // Use local date to avoid timezone issues
+    const todayStr = today.getFullYear() + '-' + 
+                     String(today.getMonth() + 1).padStart(2, '0') + '-' + 
+                     String(today.getDate()).padStart(2, '0');
+    
     const startDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
     const endDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
 
     for (let date = new Date(startDate); date <= endDate; date.setDate(date.getDate() + 1)) {
+      // Create proper date string without timezone issues
+      const dateStr = date.getFullYear() + '-' + 
+                      String(date.getMonth() + 1).padStart(2, '0') + '-' + 
+                      String(date.getDate()).padStart(2, '0');
+      
       // Skip past dates and weekends
-      if (date < today || date.getDay() === 0 || date.getDay() === 6) {
+      if (dateStr < todayStr || date.getDay() === 0 || date.getDay() === 6) {
         continue;
       }
-
-      const dateStr = date.toISOString().split('T')[0];
 
       timeSlots.forEach(time => {
         const datetime = `${dateStr}T${time}:00`;
         const datetimeObj = new Date(datetime);
         
         // Skip past times for today
-        if (dateStr === today.toISOString().split('T')[0] && datetimeObj <= today) {
+        if (dateStr === todayStr && datetimeObj <= today) {
           return;
         }
 
         // Check if this slot is already booked
-        const isBooked = existingBookings.some(booking => 
-          booking.datetime === `${datetime}:00.000Z` || 
-          booking.datetime === `${datetime}:00+00:00` ||
-          new Date(booking.datetime).getTime() === datetimeObj.getTime()
-        );
+        const isBooked = existingBookings.some(booking => {
+          const bookingDateTime = new Date(booking.datetime);
+          const slotDateTime = new Date(datetime);
+          return bookingDateTime.getTime() === slotDateTime.getTime();
+        });
 
         slots.push({
           date: dateStr,
@@ -166,6 +201,33 @@ export const Calendar: React.FC = () => {
     setSelectedTime(time);
   };
 
+  const sendConfirmationSMS = async (name: string, phone: string, jobTitle: string, datetime: string) => {
+    try {
+      const res = await fetch('https://recruiter-agent-backend-sznn.onrender.com/send-confirmation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name,
+          phone,
+          job_title: jobTitle,
+          datetime: new Date(datetime).toLocaleString()
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        console.log('Confirmation SMS sent successfully:', data);
+      } else {
+        console.error('SMS confirmation failed:', data);
+      }
+    } catch (error) {
+      console.error('Error sending confirmation SMS:', error);
+    }
+  };
+
   const handleBooking = async () => {
     if (!candidateId || !userId || !selectedDate || !selectedTime) {
       setNotification({
@@ -173,6 +235,16 @@ export const Calendar: React.FC = () => {
         type: 'error',
         title: 'Missing Information',
         message: 'Please select a date and time for your appointment.'
+      });
+      return;
+    }
+
+    if (!candidateInfo) {
+      setNotification({
+        show: true,
+        type: 'error',
+        title: 'Missing Candidate Information',
+        message: 'Unable to retrieve candidate information. Please try again.'
       });
       return;
     }
@@ -204,11 +276,19 @@ export const Calendar: React.FC = () => {
         return;
       }
 
+      // Send confirmation SMS
+      await sendConfirmationSMS(
+        candidateInfo.name,
+        candidateInfo.phone,
+        candidateInfo.position,
+        datetime
+      );
+
       setNotification({
         show: true,
         type: 'success',
         title: 'Booking Confirmed!',
-        message: `Your screening appointment has been scheduled for ${new Date(datetime).toLocaleDateString()} at ${selectedTime}.`
+        message: `Your screening appointment has been scheduled for ${new Date(datetime).toLocaleDateString()} at ${selectedTime}. A confirmation SMS has been sent to your phone.`
       });
 
       // Refresh bookings and reset selection
@@ -257,7 +337,11 @@ export const Calendar: React.FC = () => {
   };
 
   const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString('en-US', {
+    // Parse the date string manually to avoid timezone issues
+    const [year, month, day] = date.split('-').map(Number);
+    const dateObj = new Date(year, month - 1, day);
+    
+    return dateObj.toLocaleDateString('en-US', {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
@@ -334,25 +418,38 @@ export const Calendar: React.FC = () => {
                   return <div key={index} className="p-2"></div>;
                 }
 
-                const dateStr = new Date(currentDate.getFullYear(), currentDate.getMonth(), day)
-                  .toISOString().split('T')[0];
-                const isToday = dateStr === new Date().toISOString().split('T')[0];
-                const isPast = new Date(dateStr) < new Date(new Date().toISOString().split('T')[0]);
-                const isWeekend = new Date(dateStr).getDay() === 0 || new Date(dateStr).getDay() === 6;
+                // Use consistent date formatting
+                const dateStr = currentDate.getFullYear() + '-' + 
+                               String(currentDate.getMonth() + 1).padStart(2, '0') + '-' + 
+                               String(day).padStart(2, '0');
+                               
+                const today = new Date();
+                const todayStr = today.getFullYear() + '-' + 
+                                String(today.getMonth() + 1).padStart(2, '0') + '-' + 
+                                String(today.getDate()).padStart(2, '0');
+                
+                const calendarDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
+                const isToday = dateStr === todayStr;
+                const isPast = dateStr < todayStr;
+                const isWeekend = calendarDate.getDay() === 0 || calendarDate.getDay() === 6;
                 const hasAvailableSlots = getAvailableTimesForDate(dateStr).length > 0;
                 const isSelected = selectedDate === dateStr;
+
+                // A day is clickable if it's not past, not weekend, and either has available slots OR could potentially have slots
+                const isClickable = !isPast && !isWeekend;
+                const shouldShowAsAvailable = isClickable && (hasAvailableSlots || (!isPast && !isWeekend));
 
                 return (
                   <button
                     key={day}
-                    onClick={() => !isPast && !isWeekend && hasAvailableSlots && handleDateSelect(dateStr)}
-                    disabled={isPast || isWeekend || !hasAvailableSlots}
+                    onClick={() => isClickable && handleDateSelect(dateStr)}
+                    disabled={!isClickable}
                     className={`p-2 text-sm rounded-md transition-colors ${
                       isSelected
                         ? 'bg-indigo-600 text-white'
                         : isPast || isWeekend
                         ? 'text-gray-300 cursor-not-allowed'
-                        : hasAvailableSlots
+                        : shouldShowAsAvailable
                         ? 'text-gray-900 hover:bg-indigo-50 cursor-pointer'
                         : 'text-gray-400 cursor-not-allowed'
                     } ${isToday ? 'ring-2 ring-indigo-300' : ''}`}
