@@ -54,6 +54,7 @@ export const Calendar: React.FC = () => {
     phone: string;
     position: string;
   } | null>(null);
+  const [assignedJobTitle, setAssignedJobTitle] = useState<string>('');
 
   // Available time slots (9 AM to 5 PM, every hour)
   const timeSlots = [
@@ -81,6 +82,7 @@ export const Calendar: React.FC = () => {
     if (hasRequiredParams) {
       fetchExistingBookings();
       fetchCandidateInfo();
+      fetchAssignedJobTitle();
     }
   }, [candidateId, userId]);
 
@@ -131,6 +133,31 @@ export const Calendar: React.FC = () => {
       setCandidateInfo(data);
     } catch (error) {
       console.error('Error fetching candidate info:', error);
+    }
+  };
+
+  const fetchAssignedJobTitle = async () => {
+    if (!candidateId) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('candidate_job_assignments')
+        .select(`
+          job_postings!inner(title)
+        `)
+        .eq('candidate_id', candidateId)
+        .single();
+
+      if (error) {
+        console.error('Error fetching assigned job:', error);
+        return;
+      }
+
+      if (data?.job_postings?.title) {
+        setAssignedJobTitle(data.job_postings.title);
+      }
+    } catch (error) {
+      console.error('Error fetching assigned job:', error);
     }
   };
 
@@ -201,8 +228,19 @@ export const Calendar: React.FC = () => {
     setSelectedTime(time);
   };
 
-  const sendConfirmationSMS = async (name: string, phone: string, jobTitle: string, datetime: string) => {
+  const sendConfirmationSMS = async (name: string, phone: string, jobTitle: string, selectedDate: string, selectedTime: string) => {
     try {
+      // Format the date and time properly without timezone conversion
+      const [year, month, day] = selectedDate.split('-').map(Number);
+      const dateObj = new Date(year, month - 1, day);
+      const formattedDate = dateObj.toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+      const formattedDateTime = `${formattedDate} at ${selectedTime}`;
+
       const res = await fetch('https://recruiter-agent-backend-sznn.onrender.com/send-confirmation', {
         method: 'POST',
         headers: {
@@ -212,7 +250,7 @@ export const Calendar: React.FC = () => {
           name,
           phone,
           job_title: jobTitle,
-          datetime: new Date(datetime).toLocaleString()
+          datetime: formattedDateTime
         }),
       });
 
@@ -276,12 +314,14 @@ export const Calendar: React.FC = () => {
         return;
       }
 
-      // Send confirmation SMS
+      // Send confirmation SMS with assigned job title
+      const jobTitle = assignedJobTitle || candidateInfo.position;
       await sendConfirmationSMS(
         candidateInfo.name,
         candidateInfo.phone,
-        candidateInfo.position,
-        datetime
+        jobTitle,
+        selectedDate,
+        selectedTime
       );
 
       setNotification({
@@ -333,7 +373,7 @@ export const Calendar: React.FC = () => {
   };
 
   const getAvailableTimesForDate = (date: string) => {
-    return availableSlots.filter(slot => slot.date === date && slot.available);
+    return availableSlots.filter(slot => slot.date === date);
   };
 
   const formatDate = (date: string) => {
@@ -493,14 +533,18 @@ export const Calendar: React.FC = () => {
                   {getAvailableTimesForDate(selectedDate).map(slot => (
                     <button
                       key={slot.time}
-                      onClick={() => handleTimeSelect(slot.time)}
+                      onClick={() => slot.available && handleTimeSelect(slot.time)}
+                      disabled={!slot.available}
                       className={`p-3 text-sm rounded-md border transition-colors ${
-                        selectedTime === slot.time
+                        !slot.available
+                          ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                          : selectedTime === slot.time
                           ? 'bg-indigo-600 text-white border-indigo-600'
                           : 'bg-white text-gray-900 border-gray-300 hover:bg-indigo-50 hover:border-indigo-300'
                       }`}
                     >
                       {slot.time}
+                      {!slot.available && <span className="ml-1 text-xs">(Booked)</span>}
                     </button>
                   ))}
                 </div>
