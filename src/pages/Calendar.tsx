@@ -433,8 +433,68 @@ export const Calendar: React.FC = () => {
     console.log("=== SMS CONFIRMATION ATTEMPT ===");
     console.log("Params:", { candidateId, userId, selectedDate, selectedTime });
     console.log("Current candidateInfo:", candidateInfo);
+    console.log("Environment:", {
+      mode: import.meta.env.MODE,
+      backendUrl: import.meta.env.VITE_BACKEND_API_URL,
+      isDev: import.meta.env.DEV,
+      isProd: import.meta.env.PROD
+    });
     
     try {
+      const backendUrl = import.meta.env.VITE_BACKEND_API_URL || "https://recruiter-agent-backend-sznn.onrender.com";
+      
+      // Try Method 1: Use the special backend endpoint that gets real candidate data
+      console.log("🚀 METHOD 1: Trying backend SMS endpoint...");
+      try {
+        const backendSmsUrl = `${backendUrl}/send-booking-sms`;
+        console.log("Backend SMS URL:", backendSmsUrl);
+
+        const backendPayload = {
+          candidate_id: candidateId,
+          user_id: userId,
+          selected_date: selectedDate,
+          selected_time: selectedTime,
+        };
+
+        console.log("Backend SMS payload:", backendPayload);
+
+        const backendResponse = await fetch(backendSmsUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(backendPayload),
+        });
+
+        console.log("Backend SMS Response Status:", backendResponse.status);
+
+        let backendData;
+        try {
+          backendData = await backendResponse.json();
+        } catch (jsonError) {
+          console.error("Failed to parse backend response as JSON:", jsonError);
+          const textResponse = await backendResponse.text();
+          console.log("Backend Response Text:", textResponse);
+          backendData = { error: "Invalid JSON response", text: textResponse };
+        }
+
+        console.log("Backend SMS Response:", { status: backendResponse.status, data: backendData });
+
+        if (backendResponse.ok && backendData.success) {
+          console.log("✅ SMS sent successfully via backend!");
+          console.log("SMS sent to:", backendData.phone, "for candidate:", backendData.candidate_name);
+          return true;
+        } else {
+          console.log("❌ Backend SMS failed, trying fallback method...");
+        }
+      } catch (backendError) {
+        console.error("Backend SMS method failed:", backendError);
+        console.log("Trying fallback method...");
+      }
+
+      // Method 2: Fallback to original method
+      console.log("🚀 METHOD 2: Trying original SMS method...");
+      
       // First, always try to get fresh candidate data from database
       console.log("Attempting to fetch real candidate data...");
       const { data, error } = await supabase
@@ -485,18 +545,39 @@ export const Calendar: React.FC = () => {
 
         console.log("🚀 SENDING SMS with payload:", smsPayload);
 
-        const res = await fetch(
-          "https://recruiter-agent-backend-sznn.onrender.com/send-confirmation",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(smsPayload),
-          }
-        );
+        const smsUrl = `${backendUrl}/send-confirmation`;
+        console.log("SMS API URL:", smsUrl);
 
-        const responseData = await res.json();
+        // Test backend connectivity first
+        try {
+          console.log("Testing backend connectivity...");
+          const testResponse = await fetch(backendUrl, { method: 'HEAD' });
+          console.log("Backend connectivity test:", testResponse.status);
+        } catch (connectError) {
+          console.error("Backend connectivity test failed:", connectError);
+        }
+
+        const res = await fetch(smsUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(smsPayload),
+        });
+
+        console.log("SMS Response Status:", res.status);
+        console.log("SMS Response Headers:", Object.fromEntries(res.headers.entries()));
+
+        let responseData;
+        try {
+          responseData = await res.json();
+        } catch (jsonError) {
+          console.error("Failed to parse SMS response as JSON:", jsonError);
+          const textResponse = await res.text();
+          console.log("SMS Response Text:", textResponse);
+          responseData = { error: "Invalid JSON response", text: textResponse };
+        }
+
         console.log("SMS API Response:", { status: res.status, data: responseData });
 
         if (res.ok) {
