@@ -430,44 +430,60 @@ export const Calendar: React.FC = () => {
     selectedDate: string,
     selectedTime: string
   ) => {
+    console.log("=== SMS CONFIRMATION ATTEMPT ===");
+    console.log("Params:", { candidateId, userId, selectedDate, selectedTime });
+    console.log("Current candidateInfo:", candidateInfo);
+    
     try {
-      console.log("Attempting to send SMS confirmation...");
+      // First, always try to get fresh candidate data from database
+      console.log("Attempting to fetch real candidate data...");
+      const { data, error } = await supabase
+        .from("candidates")
+        .select("name, phone, position")
+        .eq("id", candidateId)
+        .limit(1);
+
+      console.log("Database query result:", { data, error });
+
+      let candidateData = null;
       
-      // First, try to get real candidate data from database
-      let candidateData = await getRealCandidateDataForSMS();
-      
-      // If we couldn't get real data from database, check if our current candidateInfo is real
-      if (!candidateData && candidateInfo) {
-        if (candidateInfo.name !== "Candidate" && candidateInfo.phone !== "000-000-0000") {
-          candidateData = candidateInfo;
-          console.log("Using existing real candidate data for SMS");
-        }
+      // Use database data if available
+      if (!error && data && data.length > 0) {
+        candidateData = data[0];
+        console.log("✅ Got real candidate data from database:", candidateData);
+      } 
+      // Otherwise use existing candidateInfo if it's not placeholder
+      else if (candidateInfo && 
+               candidateInfo.name !== "Candidate" && 
+               candidateInfo.phone !== "000-000-0000" && 
+               candidateInfo.phone !== "phone") {
+        candidateData = candidateInfo;
+        console.log("✅ Using existing real candidate data:", candidateData);
       }
-      
-      // If we have real data, send SMS directly
-      if (candidateData && 
-          candidateData.name !== "Candidate" && 
-          candidateData.phone !== "000-000-0000" && 
-          candidateData.phone !== "phone" &&
-          candidateData.phone) {
-        
+
+      // If we have valid candidate data, send SMS
+      if (candidateData && candidateData.phone) {
         const jobTitle = assignedJobTitle || candidateData.position || "Position";
+        
+        // Format datetime
         const [year, month, day] = selectedDate.split("-").map(Number);
         const dateObj = new Date(year, month - 1, day);
         const formattedDate = dateObj.toLocaleDateString("en-US", {
           weekday: "long",
-          year: "numeric",
+          year: "numeric", 
           month: "long",
           day: "numeric",
         });
         const formattedDateTime = `${formattedDate} at ${selectedTime}`;
 
-        console.log("Sending SMS confirmation with real data:", {
+        const smsPayload = {
           name: candidateData.name,
           phone: candidateData.phone,
           job_title: jobTitle,
           datetime: formattedDateTime,
-        });
+        };
+
+        console.log("🚀 SENDING SMS with payload:", smsPayload);
 
         const res = await fetch(
           "https://recruiter-agent-backend-sznn.onrender.com/send-confirmation",
@@ -476,65 +492,27 @@ export const Calendar: React.FC = () => {
             headers: {
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({
-              name: candidateData.name,
-              phone: candidateData.phone,
-              job_title: jobTitle,
-              datetime: formattedDateTime,
-            }),
+            body: JSON.stringify(smsPayload),
           }
         );
 
-        const data = await res.json();
+        const responseData = await res.json();
+        console.log("SMS API Response:", { status: res.status, data: responseData });
 
         if (res.ok) {
-          console.log("Confirmation SMS sent successfully:", data);
+          console.log("✅ SMS sent successfully!");
           return true;
         } else {
-          console.error("SMS confirmation failed:", data);
+          console.error("❌ SMS API failed:", responseData);
           return false;
         }
+      } else {
+        console.warn("❌ No valid candidate data available for SMS");
+        console.log("candidateData:", candidateData);
+        return false;
       }
-      
-      // If we don't have real data, try backend endpoint that handles everything
-      console.log("No real candidate data available, trying backend SMS endpoint");
-      
-      const backendUrl = import.meta.env.VITE_BACKEND_API_URL;
-      if (backendUrl) {
-        try {
-          const response = await fetch(`${backendUrl}/send-booking-sms`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              candidate_id: candidateId,
-              user_id: userId,
-              selected_date: selectedDate,
-              selected_time: selectedTime
-            }),
-          });
-          
-          if (response.ok) {
-            const result = await response.json();
-            console.log("Backend SMS sent successfully:", result);
-            return true;
-          } else {
-            const errorData = await response.json().catch(() => ({}));
-            console.error("Backend SMS failed:", response.status, errorData);
-            return false;
-          }
-        } catch (fetchError) {
-          console.error("Backend SMS request failed:", fetchError);
-          return false;
-        }
-      }
-      
-      console.warn("Cannot send SMS - no method available to get real candidate data");
-      return false;
-      
     } catch (error) {
-      console.error("Error sending confirmation SMS:", error);
+      console.error("❌ SMS sending error:", error);
       return false;
     }
   };
