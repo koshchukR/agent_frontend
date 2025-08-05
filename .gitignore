@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+.env
+supabase_schema.sql
+supabase_schema_extended.sql
+supabase_candidates_schema.sql
+update_job_postings_rls.sql
