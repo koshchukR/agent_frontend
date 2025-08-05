@@ -75,6 +75,20 @@ export const JobAssignmentModal: React.FC<JobAssignmentModalProps> = ({
         return
       }
 
+      // Also update the candidate's submitted_to field for automated calling
+      const { error: candidateUpdateError } = await supabase
+        .from('candidates')
+        .update({ 
+          submitted_to: selectedJobId,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', candidateId)
+
+      if (candidateUpdateError) {
+        console.error('Error updating candidate submitted_to field:', candidateUpdateError)
+        // Don't fail the assignment if this update fails, just log it
+      }
+
       onClose()
       // Reset selection state
       setSelectedJobId('')
@@ -106,6 +120,20 @@ export const JobAssignmentModal: React.FC<JobAssignmentModalProps> = ({
       if (error) {
         setError(error.message)
         return
+      }
+
+      // Also clear the candidate's submitted_to field
+      const { error: candidateUpdateError } = await supabase
+        .from('candidates')
+        .update({ 
+          submitted_to: null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', candidateId)
+
+      if (candidateUpdateError) {
+        console.error('Error clearing candidate submitted_to field:', candidateUpdateError)
+        // Don't fail the removal if this update fails, just log it
       }
 
       setSelectedJobId('')

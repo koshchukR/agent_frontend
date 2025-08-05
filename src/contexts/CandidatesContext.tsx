@@ -23,6 +23,8 @@ export interface Candidate {
   created_by: string;
   created_at: string;
   updated_at: string;
+  submitted_to?: string; // Job posting ID
+  call_agent?: string; // Recruiter ID for calling
 }
 
 interface CandidatesContextType {

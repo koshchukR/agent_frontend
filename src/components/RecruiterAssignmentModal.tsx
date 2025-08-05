@@ -71,6 +71,20 @@ export const RecruiterAssignmentModal: React.FC<RecruiterAssignmentModalProps> =
         return
       }
 
+      // Also update the candidate's call_agent field for automated calling
+      const { error: candidateUpdateError } = await supabase
+        .from('candidates')
+        .update({ 
+          call_agent: selectedRecruiterId,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', candidateId)
+
+      if (candidateUpdateError) {
+        console.error('Error updating candidate call_agent field:', candidateUpdateError)
+        // Don't fail the assignment if this update fails, just log it
+      }
+
       onClose()
       // Reset selection state
       setSelectedRecruiterId('')
@@ -106,6 +120,20 @@ export const RecruiterAssignmentModal: React.FC<RecruiterAssignmentModalProps> =
       if (error) {
         setError(error.message)
         return
+      }
+
+      // Also clear the candidate's call_agent field
+      const { error: candidateUpdateError } = await supabase
+        .from('candidates')
+        .update({ 
+          call_agent: null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', candidateId)
+
+      if (candidateUpdateError) {
+        console.error('Error clearing candidate call_agent field:', candidateUpdateError)
+        // Don't fail the removal if this update fails, just log it
       }
 
       setSelectedRecruiterId('')
