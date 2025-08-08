@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { CheckIcon } from 'lucide-react';
 export const CTASection = () => {
   return <section className="py-16 bg-gradient-to-r from-indigo-600 to-purple-600 text-white">
@@ -12,9 +13,9 @@ export const CTASection = () => {
             faster and more accurately than ever before.
           </p>
           <div className="flex flex-col sm:flex-row justify-center space-y-4 sm:space-y-0 sm:space-x-4 mb-12">
-            <button className="bg-white text-indigo-600 px-6 py-3 rounded-md font-medium hover:bg-indigo-50 transition-colors">
+            <Link to="/register" className="bg-white text-indigo-600 px-6 py-3 rounded-md font-medium hover:bg-indigo-50 transition-colors">
               Start Free Trial
-            </button>
+            </Link>
             <button className="bg-transparent border border-white text-white px-6 py-3 rounded-md font-medium hover:bg-white/10 transition-colors">
               Schedule Demo
             </button>
@@ -48,9 +49,9 @@ export const CTASection = () => {
                       <span>{feature}</span>
                     </li>)}
                 </ul>
-                <button className="w-full bg-white text-indigo-600 py-2 rounded-md font-medium hover:bg-indigo-50 transition-colors">
+                <Link to="/register" className="w-full bg-white text-indigo-600 py-2 rounded-md font-medium hover:bg-indigo-50 transition-colors text-center block">
                   Choose Plan
-                </button>
+                </Link>
               </div>)}
           </div>
         </div>

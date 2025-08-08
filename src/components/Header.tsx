@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Menu, X, ChevronDown } from 'lucide-react';
 export const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -36,12 +37,12 @@ export const Header = () => {
             </NavItem>
           </nav>
           <div className="hidden md:flex items-center space-x-4">
-            <button className="text-gray-600 hover:text-gray-900">
+            <Link to="/login" className="text-gray-600 hover:text-gray-900">
               Log In
-            </button>
-            <button className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors">
+            </Link>
+            <Link to="/register" className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors">
               Get Started
-            </button>
+            </Link>
           </div>
           <div className="md:hidden">
             <button onClick={() => setIsMenuOpen(!isMenuOpen)}>
@@ -58,10 +59,10 @@ export const Header = () => {
             <MobileNavItem label="Pricing" />
             <MobileNavItem label="Resources" />
             <div className="pt-4 flex flex-col space-y-3">
-              <button className="text-gray-600 py-2">Log In</button>
-              <button className="bg-indigo-600 text-white px-4 py-2 rounded-md">
+              <Link to="/login" className="text-gray-600 py-2">Log In</Link>
+              <Link to="/register" className="bg-indigo-600 text-white px-4 py-2 rounded-md">
                 Get Started
-              </button>
+              </Link>
             </div>
           </div>
         </div>}

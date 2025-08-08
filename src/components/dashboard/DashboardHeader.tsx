@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { MenuIcon, BellIcon, SearchIcon, ChevronDownIcon } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 interface DashboardHeaderProps {
   onMenuToggle: () => void;
   isSidebarOpen: boolean;
@@ -10,6 +11,17 @@ export const DashboardHeader = ({
 }: DashboardHeaderProps) => {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const { user, signOut } = useAuth();
+  
+  const getInitials = (firstName?: string, lastName?: string) => {
+    if (!firstName && !lastName) return 'U';
+    return `${firstName?.[0] || ''}${lastName?.[0] || ''}`.toUpperCase();
+  };
+  
+  const getDisplayName = (firstName?: string, lastName?: string) => {
+    if (!firstName && !lastName) return 'User';
+    return `${firstName || ''} ${lastName || ''}`.trim();
+  };
   return <header className="bg-white border-b border-gray-200 h-16 flex items-center z-20">
       <div className="flex-1 flex items-center justify-between px-4">
         <div className="flex items-center">
@@ -65,13 +77,13 @@ export const DashboardHeader = ({
           <div className="ml-4 relative">
             <button onClick={() => setProfileOpen(!profileOpen)} className="flex items-center focus:outline-none">
               <div className="h-8 w-8 rounded-full bg-indigo-600 flex items-center justify-center text-white">
-                JD
+                {getInitials(user?.user_metadata?.first_name, user?.user_metadata?.last_name)}
               </div>
               <div className="ml-2 hidden md:flex flex-col items-start">
                 <span className="text-sm font-medium text-gray-700">
-                  John Doe
+                  {getDisplayName(user?.user_metadata?.first_name, user?.user_metadata?.last_name)}
                 </span>
-                <span className="text-xs text-gray-500">HR Manager</span>
+                <span className="text-xs text-gray-500">{user?.email}</span>
               </div>
               <ChevronDownIcon size={16} className="ml-1 text-gray-500" />
             </button>
@@ -87,9 +99,9 @@ export const DashboardHeader = ({
                     Team Management
                   </a>
                   <div className="border-t border-gray-100"></div>
-                  <a href="#" className="block px-4 py-2 text-sm text-red-600 hover:bg-gray-100">
+                  <button onClick={signOut} className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100">
                     Sign out
-                  </a>
+                  </button>
                 </div>
               </div>}
           </div>

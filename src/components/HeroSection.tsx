@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { PhoneIcon, SearchIcon, BarChartIcon, BriefcaseIcon } from 'lucide-react';
 export const HeroSection = () => {
   return <section className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white">
@@ -13,9 +14,9 @@ export const HeroSection = () => {
               research, and intelligent matching.
             </p>
             <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
-              <button className="bg-white text-indigo-600 px-6 py-3 rounded-md font-medium hover:bg-indigo-50 transition-colors">
+              <Link to="/register" className="bg-white text-indigo-600 px-6 py-3 rounded-md font-medium hover:bg-indigo-50 transition-colors text-center">
                 Get Started
-              </button>
+              </Link>
               <button className="bg-transparent border border-white text-white px-6 py-3 rounded-md font-medium hover:bg-white/10 transition-colors">
                 Watch Demo
               </button>
