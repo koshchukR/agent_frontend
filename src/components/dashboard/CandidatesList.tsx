@@ -281,8 +281,10 @@ export const CandidatesList = () => {
       setIsProcessingWorkflow(true);
       setActiveWorkflowId(phone);
 
+      const backendUrl = import.meta.env.VITE_BACKEND_API_URL || "https://agent-backend-x58l.onrender.com";
+      
       const res = await fetch(
-        "https://recruiter-agent-backend-sznn.onrender.com/send-sms",
+        `${backendUrl}/send-sms`,
         {
           method: "POST",
           headers: {

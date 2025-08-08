@@ -76,11 +76,12 @@ export const RecruitersProvider: React.FC<{ children: React.ReactNode }> = ({
 
       console.log("Fetching recruiters from Supabase...");
 
-      // Try to fetch from Supabase
+      // Try to fetch from Supabase (only enabled recruiters, ordered by name)
       const { data, error } = await supabase
         .from("recruiters")
         .select("*")
-        .order("created_at", { ascending: false });
+        .eq("enabled", true)
+        .order("name", { ascending: true });
 
       if (error) {
         console.warn("Supabase fetch failed:", error.message);
@@ -97,9 +98,11 @@ export const RecruitersProvider: React.FC<{ children: React.ReactNode }> = ({
         if (!data || data.length === 0) {
           console.log("No recruiters in database, showing sample data");
           setRecruiters(sampleRecruiters);
-          setError("No recruiters found in database - showing sample data");
+          setError("No recruiters found in database - using sample data");
         } else {
+          console.log("Found recruiters in database:", data);
           setRecruiters(data);
+          setError(null); // Clear error if we successfully got data
         }
       }
     } catch (err) {
@@ -128,10 +131,7 @@ export const RecruitersProvider: React.FC<{ children: React.ReactNode }> = ({
     try {
       console.log("Creating recruiter with data:", recruiterData);
 
-      if (!user?.id) {
-        return { success: false, error: "User not authenticated" };
-      }
-
+      // Recruiters are now public, so no user authentication required
       const recruiterPayload = {
         name: recruiterData.name,
         avatar: recruiterData.avatar,
@@ -149,7 +149,7 @@ export const RecruitersProvider: React.FC<{ children: React.ReactNode }> = ({
         monthly_cost: recruiterData.monthly_cost || 299.0,
         cost_per_interview: recruiterData.cost_per_interview || 0,
         total_cost: recruiterData.total_cost || 0,
-        created_by: user.id,
+        created_by: user?.id || null, // Optional since recruiters are public
       };
 
       console.log("Sending payload to Supabase:", recruiterPayload);

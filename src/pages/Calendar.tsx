@@ -395,8 +395,10 @@ export const Calendar: React.FC = () => {
       // This is a bit unconventional, but we can try to get candidate data by sending a test request
       try {
         // We'll create a simple backend endpoint that just returns candidate data
+        const backendUrl = import.meta.env.VITE_BACKEND_API_URL || "https://agent-backend-x58l.onrender.com";
+        
         const response = await fetch(
-          `https://recruiter-agent-backend-sznn.onrender.com/get-candidate-info`,
+          `${backendUrl}/get-candidate-info`,
           {
             method: "POST",
             headers: {
@@ -441,7 +443,7 @@ export const Calendar: React.FC = () => {
     });
     
     try {
-      const backendUrl = import.meta.env.VITE_BACKEND_API_URL || "https://recruiter-agent-backend-sznn.onrender.com";
+      const backendUrl = import.meta.env.VITE_BACKEND_API_URL || "https://agent-backend-x58l.onrender.com";
       
       // Try Method 1: Use the special backend endpoint that gets real candidate data
       console.log("🚀 METHOD 1: Trying backend SMS endpoint...");
