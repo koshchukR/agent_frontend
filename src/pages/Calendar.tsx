@@ -133,7 +133,35 @@ export const Calendar: React.FC = () => {
       setLoading(true);
       console.log("Fetching existing bookings for userId:", userId);
       
-      // Try to fetch existing bookings, but don't fail if RLS blocks it
+      const backendUrl = import.meta.env.VITE_BACKEND_API_URL || "https://agent-backend-x58l.onrender.com";
+      
+      // Try backend endpoint first
+      try {
+        const response = await fetch(`${backendUrl}/calendar/availability/${userId}`);
+        
+        if (response.ok) {
+          const bookings = await response.json();
+          console.log("Successfully fetched bookings from backend:", bookings);
+          
+          // Transform backend data to match expected format
+          const transformedBookings = bookings.map((booking: any) => ({
+            id: booking.id || 'unknown',
+            candidate_id: booking.candidate_id || '',
+            user_id: booking.user_id || userId,
+            datetime: booking.datetime,
+            status: 'scheduled'
+          }));
+          
+          setExistingBookings(transformedBookings);
+          return;
+        } else {
+          console.log("Backend availability endpoint failed, trying Supabase fallback");
+        }
+      } catch (backendError) {
+        console.log("Backend request failed, trying Supabase fallback:", backendError);
+      }
+      
+      // Fallback to Supabase
       const { data, error } = await executePublicQuery(
         () => supabasePublic
           .from("candidate_screenings")
@@ -144,16 +172,15 @@ export const Calendar: React.FC = () => {
         [] // fallback to empty array if RLS blocks access
       );
 
-      console.log("Existing bookings result:", { data, error });
+      console.log("Supabase existing bookings result:", { data, error });
 
       // Always use the data, even if it's empty due to RLS restrictions
-      // This ensures the calendar shows all slots as available rather than failing
       setExistingBookings(data || []);
       
       if (error) {
-        console.warn("Could not fetch existing bookings (probably due to RLS), showing all slots as available:", error);
+        console.warn("Could not fetch existing bookings from Supabase (probably due to RLS), showing all slots as available:", error);
       } else {
-        console.log(`Successfully loaded ${data?.length || 0} existing bookings`);
+        console.log(`Successfully loaded ${data?.length || 0} existing bookings from Supabase`);
       }
     } catch (error) {
       console.error("Error fetching bookings:", error);
@@ -165,45 +192,48 @@ export const Calendar: React.FC = () => {
   };
 
   const fetchCandidateInfo = async () => {
-    if (!candidateId) return;
+    if (!candidateId || !userId) return;
 
     try {
-      console.log("Fetching candidate info for ID:", candidateId);
-      console.log("Candidate ID length:", candidateId?.length);
-      console.log("Candidate ID type:", typeof candidateId);
+      console.log("Fetching candidate info for ID:", candidateId, "User:", userId);
       
-      // Try public Supabase client first (for when RLS allows it)
-      const { data, error } = await executePublicQuery(
-        () => supabasePublic
-          .from("candidates")
-          .select("name, phone, position")
-          .eq("id", candidateId)
-          .limit(1),
-        [] // fallback to empty array
-      );
-
-      console.log("Candidate fetch result:", { data, error });
-
-      // If we successfully got candidate data, use it
-      if (data && data.length > 0) {
-        const candidateData = data[0];
-        console.log("Successfully fetched candidate info:", candidateData);
+      const backendUrl = import.meta.env.VITE_BACKEND_API_URL || "https://agent-backend-x58l.onrender.com";
+      
+      // Use your actual backend endpoint
+      const response = await fetch(`${backendUrl}/calendar/candidate-info/${candidateId}/${userId}`);
+      
+      console.log("Backend response status:", response.status);
+      
+      if (response.ok) {
+        const candidateData = await response.json();
+        console.log("Successfully fetched candidate info from backend:", candidateData);
         setCandidateInfo(candidateData);
         return;
+      } else if (response.status === 404) {
+        console.log("Candidate not found, trying fallback methods...");
+        
+        // Try public Supabase client as fallback
+        const { data, error } = await executePublicQuery(
+          () => supabasePublic
+            .from("candidates")
+            .select("name, phone, position")
+            .eq("id", candidateId)
+            .limit(1),
+          [] // fallback to empty array
+        );
+
+        console.log("Supabase fallback result:", { data, error });
+
+        // If we successfully got candidate data, use it
+        if (data && data.length > 0) {
+          const candidateData = data[0];
+          console.log("Successfully fetched candidate info from Supabase:", candidateData);
+          setCandidateInfo(candidateData);
+          return;
+        }
       }
 
-      // If we have an error, handle it gracefully
-      if (error) {
-        console.error("Error fetching candidate info:", error);
-        console.error("Error details:", {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint
-        });
-      }
-
-      // For RLS errors or no data, use fallback candidate info to allow booking
+      // For errors or no data, use fallback candidate info to allow booking
       console.log("Using fallback candidate info to allow booking");
       
       // Create placeholder candidate info that allows booking to proceed
@@ -228,7 +258,7 @@ export const Calendar: React.FC = () => {
         show: true,
         type: "error",
         title: "Network Error",
-        message: "Failed to connect to the database. Please check your internet connection and try again.",
+        message: "Failed to connect to the backend. Please check your internet connection and try again.",
       });
     }
   };
@@ -659,7 +689,54 @@ export const Calendar: React.FC = () => {
         status: "scheduled",
       });
 
-      // Try to create booking with public client
+      const backendUrl = import.meta.env.VITE_BACKEND_API_URL || "https://agent-backend-x58l.onrender.com";
+      
+      // Try to create booking with backend endpoint first
+      try {
+        console.log("Attempting to create booking via backend...");
+        const bookingResponse = await fetch(`${backendUrl}/calendar/create-booking`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            candidate_id: candidateId,
+            user_id: userId,
+            datetime: datetime,
+            status: "scheduled",
+          }),
+        });
+
+        if (bookingResponse.ok) {
+          const bookingData = await bookingResponse.json();
+          console.log("Booking created successfully via backend:", bookingData);
+          
+          // Send SMS confirmation using smart function
+          const smsSuccess = await sendSmartConfirmationSMS(selectedDateStr, selectedTime);
+          
+          setNotification({
+            show: true,
+            type: "success",
+            title: "Booking Confirmed!",
+            message: `Your screening appointment has been scheduled for ${new Date(
+              datetime
+            ).toLocaleDateString()} at ${selectedTime}. ${smsSuccess ? 'A confirmation SMS has been sent to your phone.' : 'Please contact the recruiter if you need confirmation.'}`,
+          });
+
+          // Refresh bookings and reset selection
+          await fetchExistingBookings();
+          setSelectedDate(null);
+          setSelectedTime("");
+          return;
+        } else {
+          console.log("Backend booking creation failed, trying Supabase fallback");
+        }
+      } catch (backendError) {
+        console.log("Backend booking request failed, trying Supabase fallback:", backendError);
+      }
+
+      // Fallback to Supabase direct insertion
+      console.log("Trying Supabase direct insertion as fallback...");
       const { data: insertData, error } = await executePublicQuery(
         () => supabasePublic
           .from("candidate_screenings")
@@ -675,11 +752,11 @@ export const Calendar: React.FC = () => {
         null // no fallback for insert operations
       );
 
-      console.log("Booking insertion result:", { insertData, error });
+      console.log("Supabase booking insertion result:", { insertData, error });
 
       // If booking creation succeeded, proceed normally
       if (!error && insertData) {
-        console.log("Booking created successfully:", insertData);
+        console.log("Booking created successfully via Supabase:", insertData);
       } else if (error) {
         // If booking failed due to RLS restrictions, show informative message but still proceed
         console.warn("Booking creation may have failed due to RLS restrictions:", error);
