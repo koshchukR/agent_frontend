@@ -643,7 +643,18 @@ export const Calendar: React.FC = () => {
   };
 
   const handleBooking = async () => {
+    console.log("=== BOOKING ATTEMPT STARTED ===");
+    console.log("Initial state:", {
+      candidateId,
+      userId,
+      selectedDate,
+      selectedTime,
+      candidateInfo,
+      hasRequiredParams
+    });
+
     if (!candidateId || !userId || !selectedDate || !selectedTime) {
+      console.error("Missing required parameters for booking");
       setNotification({
         show: true,
         type: "error",
@@ -661,6 +672,7 @@ export const Calendar: React.FC = () => {
       String(selectedDate.getDate()).padStart(2, "0");
 
     if (!candidateInfo) {
+      console.error("Candidate info not available for booking");
       setNotification({
         show: true,
         type: "error",
@@ -675,6 +687,7 @@ export const Calendar: React.FC = () => {
 
       const datetime = `${selectedDateStr}T${selectedTime}:00.000Z`;
 
+      console.log("=== BOOKING DETAILS ===");
       console.log("Booking appointment:", {
         selectedDate: selectedDateStr,
         selectedTime,
@@ -682,36 +695,59 @@ export const Calendar: React.FC = () => {
         timestamp: new Date(datetime).getTime(),
       });
 
-      console.log("Attempting to insert booking:", {
+      console.log("=== BOOKING PAYLOAD ===");
+      const bookingPayload = {
         candidate_id: candidateId,
         user_id: userId,
         datetime: datetime,
         status: "scheduled",
-      });
+      };
+      console.log("Attempting to insert booking:", bookingPayload);
 
       const backendUrl = import.meta.env.VITE_BACKEND_API_URL || "https://agent-backend-x58l.onrender.com";
       
+      console.log("=== BACKEND URL CONFIG ===");
+      console.log("Environment:", import.meta.env.MODE);
+      console.log("Backend URL from env:", import.meta.env.VITE_BACKEND_API_URL);
+      console.log("Final backend URL:", backendUrl);
+      
       // Try to create booking with backend endpoint first
       try {
+        console.log("=== BACKEND BOOKING ATTEMPT ===");
+        const bookingUrl = `${backendUrl}/calendar/create-booking`;
+        console.log("Booking URL:", bookingUrl);
+        
         console.log("Attempting to create booking via backend...");
-        const bookingResponse = await fetch(`${backendUrl}/calendar/create-booking`, {
+        const bookingResponse = await fetch(bookingUrl, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            candidate_id: candidateId,
-            user_id: userId,
-            datetime: datetime,
-            status: "scheduled",
-          }),
+          body: JSON.stringify(bookingPayload),
         });
 
+        console.log("=== BACKEND RESPONSE ===");
+        console.log("Response status:", bookingResponse.status);
+        console.log("Response headers:", Object.fromEntries(bookingResponse.headers.entries()));
+        
+        const responseText = await bookingResponse.text();
+        console.log("Raw response text:", responseText);
+        
+        let bookingData;
+        try {
+          bookingData = JSON.parse(responseText);
+          console.log("Parsed booking data:", bookingData);
+        } catch (parseError) {
+          console.error("Failed to parse response as JSON:", parseError);
+          console.log("Response was not valid JSON, treating as error");
+          throw new Error(`Invalid response: ${responseText}`);
+        }
+
         if (bookingResponse.ok) {
-          const bookingData = await bookingResponse.json();
-          console.log("Booking created successfully via backend:", bookingData);
+          console.log("✅ Booking created successfully via backend:", bookingData);
           
-          // Send SMS confirmation using smart function
+          // Now try SMS confirmation
+          console.log("=== SMS CONFIRMATION ATTEMPT ===");
           const smsSuccess = await sendSmartConfirmationSMS(selectedDateStr, selectedTime);
           
           setNotification({
@@ -729,10 +765,14 @@ export const Calendar: React.FC = () => {
           setSelectedTime("");
           return;
         } else {
-          console.log("Backend booking creation failed, trying Supabase fallback");
+          console.error("❌ Backend booking creation failed:");
+          console.error("Status:", bookingResponse.status);
+          console.error("Error data:", bookingData);
+          console.log("Trying Supabase fallback...");
         }
       } catch (backendError) {
-        console.log("Backend booking request failed, trying Supabase fallback:", backendError);
+        console.error("❌ Backend booking request failed:", backendError);
+        console.log("Trying Supabase fallback...");
       }
 
       // Fallback to Supabase direct insertion
